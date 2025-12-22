@@ -302,12 +302,31 @@ class MultiDocGenerator
             $substitutions['mycompany_default_bank_bic'] = !empty($mysoc->bank_account) ? $mysoc->bank_account->bic : '';
         }
 
-        // Add user substitutions
+        // Add logged-in user substitutions (complete user info)
         $substitutions['user_login'] = $user->login;
         $substitutions['user_firstname'] = $user->firstname;
         $substitutions['user_lastname'] = $user->lastname;
         $substitutions['user_fullname'] = $user->getFullName($langs);
         $substitutions['user_email'] = $user->email;
+        $substitutions['user_phone'] = $user->office_phone;
+        $substitutions['user_phone_mobile'] = $user->user_mobile;
+        $substitutions['user_fax'] = $user->office_fax;
+        $substitutions['user_address'] = $user->address;
+        $substitutions['user_zip'] = $user->zip;
+        $substitutions['user_town'] = $user->town;
+        $substitutions['user_country'] = $user->country;
+        $substitutions['user_signature'] = $user->signature;
+        $substitutions['user_job'] = $user->job;
+        $substitutions['user_note_public'] = $user->note_public;
+        $substitutions['user_note_private'] = $user->note_private;
+
+        // User extra fields: {user_options_xxx}
+        if (!empty($user->array_options)) {
+            foreach ($user->array_options as $key => $val) {
+                $clean_key = preg_replace('/^options_/', '', $key);
+                $substitutions['user_options_'.$clean_key] = $val;
+            }
+        }
 
         // Add date/time substitutions
         $substitutions['date'] = dol_print_date(dol_now(), 'day');
@@ -331,6 +350,11 @@ class MultiDocGenerator
         global $langs;
 
         $subs = array();
+
+        // Ensure extra fields are loaded
+        if (empty($object->array_options) && method_exists($object, 'fetch_optionals')) {
+            $object->fetch_optionals();
+        }
 
         // Standard Dolibarr company/thirdparty substitution tags
         // As documented in wiki.dolibarr.org ODT template guide
@@ -395,6 +419,7 @@ class MultiDocGenerator
     /**
      * Get contact-specific substitutions
      * Uses Dolibarr's standard {contact_xxx} tags
+     * Also includes thirdparty (company) tags and logged-in user tags
      *
      * @param Contact $object Contact object
      * @return array Substitutions
@@ -404,6 +429,11 @@ class MultiDocGenerator
         global $langs;
 
         $subs = array();
+
+        // Ensure extra fields are loaded for contact
+        if (empty($object->array_options) && method_exists($object, 'fetch_optionals')) {
+            $object->fetch_optionals();
+        }
 
         // Standard Dolibarr contact substitution tags
         $subs['contact_civility'] = $object->civility;
@@ -441,10 +471,13 @@ class MultiDocGenerator
         }
 
         // If contact has a linked thirdparty, also include company tags
+        // This allows using {company_xxx} variables in contact templates
         if (!empty($object->socid) && $object->socid > 0) {
             require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
             $thirdparty = new Societe($this->db);
             if ($thirdparty->fetch($object->socid) > 0) {
+                // Fetch thirdparty extra fields
+                $thirdparty->fetch_optionals();
                 // Add company tags for the linked thirdparty
                 $company_subs = $this->getThirdpartySubstitutions($thirdparty);
                 $subs = array_merge($subs, $company_subs);
