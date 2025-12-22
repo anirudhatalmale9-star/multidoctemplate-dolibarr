@@ -305,15 +305,39 @@ class MultiDocTemplate extends CommonObject
 
         $templates = array();
 
-        // Get user's groups
-        $usergroups = $user->listOfGroups($user->id);
-        if (empty($usergroups)) {
-            return $templates;
-        }
+        // Get user's groups directly from database
+        $sql_groups = "SELECT fk_usergroup FROM ".MAIN_DB_PREFIX."usergroup_user";
+        $sql_groups .= " WHERE fk_user = ".(int) $user->id;
+        $sql_groups .= " AND entity IN (".getEntity('usergroup').")";
+
+        dol_syslog(get_class($this)."::fetchAllForUser get groups", LOG_DEBUG);
+        $resql_groups = $this->db->query($sql_groups);
 
         $groupids = array();
-        foreach ($usergroups as $group) {
-            $groupids[] = (int) $group['id'];
+        if ($resql_groups) {
+            while ($obj_group = $this->db->fetch_object($resql_groups)) {
+                $groupids[] = (int) $obj_group->fk_usergroup;
+            }
+            $this->db->free($resql_groups);
+        }
+
+        // If user has no groups, return empty (or return all templates if user is admin)
+        if (empty($groupids)) {
+            // If user is admin, show all templates
+            if ($user->admin) {
+                $sql_all_groups = "SELECT rowid FROM ".MAIN_DB_PREFIX."usergroup";
+                $sql_all_groups .= " WHERE entity IN (".getEntity('usergroup').")";
+                $resql_all = $this->db->query($sql_all_groups);
+                if ($resql_all) {
+                    while ($obj_grp = $this->db->fetch_object($resql_all)) {
+                        $groupids[] = (int) $obj_grp->rowid;
+                    }
+                    $this->db->free($resql_all);
+                }
+            }
+            if (empty($groupids)) {
+                return $templates;
+            }
         }
 
         $sql = "SELECT t.rowid, t.ref, t.label, t.description, t.fk_usergroup,";
