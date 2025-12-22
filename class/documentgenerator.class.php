@@ -438,12 +438,23 @@ class MultiDocGenerator
             }
         }
 
-        // Add date/time substitutions
-        $substitutions['date'] = dol_print_date(dol_now(), 'day');
-        $substitutions['datehour'] = dol_print_date(dol_now(), 'dayhour');
+        // Add date/time substitutions - Standard Dolibarr format
+        $now = dol_now();
+        $substitutions['date'] = dol_print_date($now, 'day');
+        $substitutions['datehour'] = dol_print_date($now, 'dayhour');
         $substitutions['year'] = date('Y');
         $substitutions['month'] = date('m');
         $substitutions['day'] = date('d');
+
+        // Dolibarr standard date variables (from wiki documentation)
+        $substitutions['current_date'] = dol_print_date($now, 'day');
+        $substitutions['current_datehour'] = dol_print_date($now, 'dayhour');
+        $substitutions['current_server_date'] = dol_print_date($now, 'day');
+        $substitutions['current_server_datehour'] = dol_print_date($now, 'dayhour');
+        $substitutions['current_date_locale'] = dol_print_date($now, 'daytext');
+        $substitutions['current_datehour_locale'] = dol_print_date($now, 'dayhourtext');
+        $substitutions['current_server_date_locale'] = dol_print_date($now, 'daytext');
+        $substitutions['current_server_datehour_locale'] = dol_print_date($now, 'dayhourtext');
 
         return $substitutions;
     }
