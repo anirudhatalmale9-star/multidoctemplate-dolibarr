@@ -175,25 +175,8 @@ class modMultiDocTemplate extends DolibarrModules
         $this->rights[$r][5] = '';
         $r++;
 
-        // Menus
+        // Menus - No left menu, module works only through tabs on User Groups, Third Party and Contact cards
         $this->menu = array();
-        $r = 0;
-
-        // Left menu entry under Tools
-        $this->menu[$r++] = array(
-            'fk_menu' => 'fk_mainmenu=tools',
-            'type' => 'left',
-            'titre' => 'MultiDocTemplate',
-            'mainmenu' => 'tools',
-            'leftmenu' => 'multidoctemplate',
-            'url' => '/multidoctemplate/index.php',
-            'langs' => 'multidoctemplate@multidoctemplate',
-            'position' => 100,
-            'enabled' => '$conf->multidoctemplate->enabled',
-            'perms' => '$user->hasRight("multidoctemplate","lire")',
-            'target' => '',
-            'user' => 2
-        );
     }
 
     /**
