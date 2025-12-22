@@ -78,6 +78,12 @@ class MultiDocGenerator
             case 'ods':
                 $result = $this->processODS($template->filepath, $output_filepath, $object, $object_type);
                 break;
+            case 'xlsx':
+                $result = $this->processXLSX($template->filepath, $output_filepath, $object, $object_type);
+                break;
+            case 'docx':
+                $result = $this->processDOCX($template->filepath, $output_filepath, $object, $object_type);
+                break;
             default:
                 // For other formats, just copy with basic text substitution if possible
                 $result = $this->processCopy($template->filepath, $output_filepath, $object, $object_type);
@@ -200,9 +206,113 @@ class MultiDocGenerator
      */
     protected function processODS($template_path, $output_path, $object, $object_type)
     {
-        // For ODS, we use similar approach but with spreadsheet handling
-        // Fallback to copy for now
-        return $this->processCopy($template_path, $output_path, $object, $object_type);
+        // ODS files are ZIP archives with XML content
+        return $this->processZipXML($template_path, $output_path, $object, $object_type, 'content.xml');
+    }
+
+    /**
+     * Process XLSX template with variable substitution
+     *
+     * @param string $template_path Path to template
+     * @param string $output_path Path for output file
+     * @param CommonObject $object Object for substitution
+     * @param string $object_type Object type
+     * @return int >0 if OK, <0 if KO
+     */
+    protected function processXLSX($template_path, $output_path, $object, $object_type)
+    {
+        // XLSX files are ZIP archives with XML content in xl/sharedStrings.xml and xl/worksheets/*.xml
+        return $this->processZipXML($template_path, $output_path, $object, $object_type, array(
+            'xl/sharedStrings.xml',
+            'xl/worksheets/sheet1.xml',
+            'xl/worksheets/sheet2.xml',
+            'xl/worksheets/sheet3.xml'
+        ));
+    }
+
+    /**
+     * Process DOCX template with variable substitution
+     *
+     * @param string $template_path Path to template
+     * @param string $output_path Path for output file
+     * @param CommonObject $object Object for substitution
+     * @param string $object_type Object type
+     * @return int >0 if OK, <0 if KO
+     */
+    protected function processDOCX($template_path, $output_path, $object, $object_type)
+    {
+        // DOCX files are ZIP archives with XML content in word/document.xml
+        return $this->processZipXML($template_path, $output_path, $object, $object_type, array(
+            'word/document.xml',
+            'word/header1.xml',
+            'word/header2.xml',
+            'word/footer1.xml',
+            'word/footer2.xml'
+        ));
+    }
+
+    /**
+     * Process ZIP-based XML document (ODS, XLSX, DOCX) with variable substitution
+     *
+     * @param string $template_path Path to template
+     * @param string $output_path Path for output file
+     * @param CommonObject $object Object for substitution
+     * @param string $object_type Object type
+     * @param string|array $xml_files XML file(s) inside the ZIP to process
+     * @return int >0 if OK, <0 if KO
+     */
+    protected function processZipXML($template_path, $output_path, $object, $object_type, $xml_files)
+    {
+        global $langs;
+
+        if (!class_exists('ZipArchive')) {
+            $this->error = 'ZipArchive class not available';
+            return $this->processCopy($template_path, $output_path, $object, $object_type);
+        }
+
+        // Copy template to output location first
+        if (!dol_copy($template_path, $output_path, 0, 1)) {
+            $this->error = $langs->trans('ErrorFileCopyFailed');
+            return -20;
+        }
+
+        // Open the copied file for modification
+        $zip = new ZipArchive();
+        if ($zip->open($output_path) !== true) {
+            $this->error = $langs->trans('ErrorCanNotOpenFile', $output_path);
+            return -21;
+        }
+
+        // Get substitution array
+        $substitutions = $this->getSubstitutionArray($object, $object_type);
+
+        // Process each XML file
+        if (!is_array($xml_files)) {
+            $xml_files = array($xml_files);
+        }
+
+        foreach ($xml_files as $xml_file) {
+            $content = $zip->getFromName($xml_file);
+            if ($content !== false) {
+                // Replace variables in content
+                foreach ($substitutions as $key => $value) {
+                    // Handle null values
+                    if ($value === null) {
+                        $value = '';
+                    }
+                    // Replace {variable} format
+                    $content = str_replace('{'.$key.'}', htmlspecialchars($value, ENT_XML1, 'UTF-8'), $content);
+                }
+
+                // Update the file in the ZIP
+                $zip->deleteName($xml_file);
+                $zip->addFromString($xml_file, $content);
+            }
+        }
+
+        $zip->close();
+
+        return 1;
     }
 
     /**
