@@ -219,6 +219,21 @@ class MultiDocTemplate extends CommonObject
             // if ($result < 0) $error++;
         }
 
+        // First delete all archives that reference this template
+        if (!$error) {
+            $sql = "DELETE FROM ".MAIN_DB_PREFIX."multidoctemplate_archive";
+            $sql .= " WHERE fk_template = ".(int) $this->id;
+
+            dol_syslog(get_class($this)."::delete archives", LOG_DEBUG);
+            $resql = $this->db->query($sql);
+
+            if (!$resql) {
+                $this->error = $this->db->lasterror();
+                $error++;
+            }
+        }
+
+        // Then delete the template
         if (!$error) {
             $sql = "DELETE FROM ".MAIN_DB_PREFIX.$this->table_element;
             $sql .= " WHERE rowid = ".(int) $this->id;
