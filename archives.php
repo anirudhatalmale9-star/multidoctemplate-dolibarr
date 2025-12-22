@@ -361,75 +361,196 @@ function filterTemplates() {
     print '</div>';
 }
 
-// List of archives
+// List of archives - File Explorer Style with collapsible folders
 print '<br>';
 print load_fiche_titre($langs->trans('ArchivesList'), '', '');
 
 $archives = $archive->fetchAllByObject($object_type, $object->id);
 
-print '<div class="div-table-responsive">';
-print '<table class="noborder centpercent">';
-print '<tr class="liste_titre">';
-print '<th>'.$langs->trans('Tag').'</th>';
-print '<th>'.$langs->trans('Filename').'</th>';
-print '<th class="center">'.$langs->trans('DateGeneration').'</th>';
-print '<th class="center">'.$langs->trans('Actions').'</th>';
-print '</tr>';
-
 if (is_array($archives) && count($archives) > 0) {
-    $current_tag = null;
+    // Group archives by tag
+    $archives_by_tag = array();
     foreach ($archives as $arch) {
-        // Show tag separator row when tag changes
-        $tag_display = !empty($arch->template_tag) ? $arch->template_tag : $langs->trans('NoTag');
-        if ($current_tag !== $tag_display) {
-            $current_tag = $tag_display;
+        $tag_label = !empty($arch->template_tag) ? $arch->template_tag : $langs->trans('NoTag');
+        if (!isset($archives_by_tag[$tag_label])) {
+            $archives_by_tag[$tag_label] = array();
         }
-
-        print '<tr class="oddeven">';
-
-        // Tag
-        print '<td><span class="badge badge-secondary">'.dol_escape_htmltag($tag_display).'</span></td>';
-
-        // Filename (with download link)
-        print '<td>';
-        if (file_exists($arch->filepath)) {
-            $relative_path = str_replace(DOL_DATA_ROOT.'/multidoctemplate/', '', $arch->filepath);
-            print '<a href="'.DOL_URL_ROOT.'/document.php?modulepart=multidoctemplate&file='.urlencode($relative_path).'" target="_blank">';
-            print img_picto('', 'file').' '.dol_escape_htmltag($arch->filename);
-            print '</a>';
-        } else {
-            print '<span class="opacitymedium">'.dol_escape_htmltag($arch->filename).' ('.$langs->trans('FileNotFound').')</span>';
-        }
-        print '</td>';
-
-        // Date generation
-        print '<td class="center">'.dol_print_date($arch->date_generation, 'day').'</td>';
-
-        // Actions
-        print '<td class="center nowraponall">';
-        // Download
-        if (file_exists($arch->filepath)) {
-            $relative_path = str_replace(DOL_DATA_ROOT.'/multidoctemplate/', '', $arch->filepath);
-            print '<a href="'.DOL_URL_ROOT.'/document.php?modulepart=multidoctemplate&file='.urlencode($relative_path).'" target="_blank">';
-            print img_picto($langs->trans('Download'), 'download');
-            print '</a> ';
-        }
-        // Delete
-        if ($user->hasRight('multidoctemplate', 'archive_supprimer')) {
-            print '<a class="deletefilelink" href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&object_type='.$object_type.'&action=delete&archive_id='.$arch->id.'&token='.newToken().'">';
-            print img_picto($langs->trans('Delete'), 'delete');
-            print '</a>';
-        }
-        print '</td>';
-
-        print '</tr>';
+        $archives_by_tag[$tag_label][] = $arch;
     }
-} else {
-    print '<tr class="oddeven"><td colspan="4" class="opacitymedium">'.$langs->trans('NoArchivesYet').'</td></tr>';
+    ksort($archives_by_tag);
+
+    // Search and controls
+    print '<div class="marginbottomonly">';
+    print '<input type="text" id="archive_search" class="flat minwidth200" placeholder="'.$langs->trans('Search').'..." onkeyup="filterArchives()">';
+    print ' <a href="javascript:void(0)" onclick="expandAllArchiveFolders()">'.$langs->trans('ExpandAll').'</a>';
+    print ' | <a href="javascript:void(0)" onclick="collapseAllArchiveFolders()">'.$langs->trans('CollapseAll').'</a>';
+    print '</div>';
+
+    // File explorer style container
+    print '<div id="archive_explorer" class="div-table-responsive" style="max-height: 500px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background: #fafafa;">';
+
+    foreach ($archives_by_tag as $tag_label => $tag_archives) {
+        $tag_id = 'arch_tag_'.md5($tag_label);
+        $count = count($tag_archives);
+
+        // Folder header (collapsible)
+        print '<div class="archive-folder" data-tag="'.dol_escape_htmltag(strtolower($tag_label)).'">';
+        print '<div class="folder-header" onclick="toggleArchiveFolder(\''.$tag_id.'\')" style="cursor: pointer; padding: 8px; background: #e8e8e8; margin-bottom: 2px; border-radius: 3px;">';
+        print '<span id="'.$tag_id.'_icon" style="font-family: monospace;">[-]</span> ';
+        print '<strong>'.img_picto('', 'folder', 'style="vertical-align: middle;"').' '.dol_escape_htmltag($tag_label).'</strong>';
+        print ' <span class="opacitymedium">('.$count.' '.$langs->trans('Files').')</span>';
+        print '</div>';
+
+        // Folder content (archives list)
+        print '<div id="'.$tag_id.'_content" class="archive-folder-content" style="margin-left: 10px; display: block;">';
+
+        // Table header for this folder
+        print '<table class="noborder centpercent" style="margin-bottom: 10px;">';
+        print '<tr class="liste_titre">';
+        print '<th class="sortable" onclick="sortArchiveTable(\''.$tag_id.'\', 0)" style="cursor: pointer;">'.$langs->trans('Filename').' ↕</th>';
+        print '<th class="center sortable" onclick="sortArchiveTable(\''.$tag_id.'\', 1)" style="cursor: pointer;">'.$langs->trans('DateGeneration').' ↕</th>';
+        print '<th class="center">'.$langs->trans('Actions').'</th>';
+        print '</tr>';
+
+        foreach ($tag_archives as $arch) {
+            print '<tr class="oddeven archive-row" data-filename="'.dol_escape_htmltag(strtolower($arch->filename)).'" data-date="'.$arch->date_generation.'">';
+
+            // Filename (with download link)
+            print '<td>';
+            if (file_exists($arch->filepath)) {
+                $relative_path = str_replace(DOL_DATA_ROOT.'/multidoctemplate/', '', $arch->filepath);
+                print '<a href="'.DOL_URL_ROOT.'/document.php?modulepart=multidoctemplate&file='.urlencode($relative_path).'" target="_blank">';
+                print img_picto('', 'file', 'style="vertical-align: middle;"').' '.dol_escape_htmltag($arch->filename);
+                print '</a>';
+            } else {
+                print '<span class="opacitymedium">'.img_picto('', 'file').' '.dol_escape_htmltag($arch->filename).' ('.$langs->trans('FileNotFound').')</span>';
+            }
+            print '</td>';
+
+            // Date generation
+            print '<td class="center">'.dol_print_date($arch->date_generation, 'dayhour').'</td>';
+
+            // Actions
+            print '<td class="center nowraponall">';
+            if (file_exists($arch->filepath)) {
+                $relative_path = str_replace(DOL_DATA_ROOT.'/multidoctemplate/', '', $arch->filepath);
+                print '<a href="'.DOL_URL_ROOT.'/document.php?modulepart=multidoctemplate&file='.urlencode($relative_path).'" target="_blank">';
+                print img_picto($langs->trans('Download'), 'download');
+                print '</a> ';
+            }
+            if ($user->hasRight('multidoctemplate', 'archive_supprimer')) {
+                print '<a class="deletefilelink" href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&object_type='.$object_type.'&action=delete&archive_id='.$arch->id.'&token='.newToken().'">';
+                print img_picto($langs->trans('Delete'), 'delete');
+                print '</a>';
+            }
+            print '</td>';
+
+            print '</tr>';
+        }
+
+        print '</table>';
+        print '</div>'; // archive-folder-content
+        print '</div>'; // archive-folder
+    }
+
+    print '</div>'; // archive_explorer
+
+    // JavaScript for archive explorer functionality
+    print '<script type="text/javascript">
+function toggleArchiveFolder(tagId) {
+    var content = document.getElementById(tagId + "_content");
+    var icon = document.getElementById(tagId + "_icon");
+    if (content.style.display === "none") {
+        content.style.display = "block";
+        icon.innerHTML = "[-]";
+    } else {
+        content.style.display = "none";
+        icon.innerHTML = "[+]";
+    }
 }
 
-print '</table>';
-print '</div>';
+function expandAllArchiveFolders() {
+    var contents = document.querySelectorAll(".archive-folder-content");
+    var icons = document.querySelectorAll("[id^=\'arch_tag_\'][id$=\'_icon\']");
+    contents.forEach(function(el) { el.style.display = "block"; });
+    icons.forEach(function(el) { el.innerHTML = "[-]"; });
+}
+
+function collapseAllArchiveFolders() {
+    var contents = document.querySelectorAll(".archive-folder-content");
+    var icons = document.querySelectorAll("[id^=\'arch_tag_\'][id$=\'_icon\']");
+    contents.forEach(function(el) { el.style.display = "none"; });
+    icons.forEach(function(el) { el.innerHTML = "[+]"; });
+}
+
+function filterArchives() {
+    var search = document.getElementById("archive_search").value.toLowerCase();
+    var folders = document.querySelectorAll(".archive-folder");
+
+    folders.forEach(function(folder) {
+        var rows = folder.querySelectorAll(".archive-row");
+        var hasVisible = false;
+
+        rows.forEach(function(row) {
+            var filename = row.getAttribute("data-filename");
+            if (filename.indexOf(search) > -1 || search === "") {
+                row.style.display = "";
+                hasVisible = true;
+            } else {
+                row.style.display = "none";
+            }
+        });
+
+        var tag = folder.getAttribute("data-tag");
+        if (hasVisible || tag.indexOf(search) > -1 || search === "") {
+            folder.style.display = "block";
+            if (search !== "") {
+                var content = folder.querySelector(".archive-folder-content");
+                var icon = folder.querySelector("[id$=\'_icon\']");
+                if (content) content.style.display = "block";
+                if (icon) icon.innerHTML = "[-]";
+            }
+        } else {
+            folder.style.display = "none";
+        }
+    });
+}
+
+var sortDirections = {};
+function sortArchiveTable(tagId, colIndex) {
+    var content = document.getElementById(tagId + "_content");
+    var table = content.querySelector("table");
+    var tbody = table.querySelector("tbody") || table;
+    var rows = Array.from(tbody.querySelectorAll("tr.archive-row"));
+
+    var key = tagId + "_" + colIndex;
+    sortDirections[key] = !sortDirections[key];
+    var ascending = sortDirections[key];
+
+    rows.sort(function(a, b) {
+        var aVal, bVal;
+        if (colIndex === 0) {
+            aVal = a.getAttribute("data-filename");
+            bVal = b.getAttribute("data-filename");
+        } else {
+            aVal = a.getAttribute("data-date");
+            bVal = b.getAttribute("data-date");
+        }
+
+        if (aVal < bVal) return ascending ? -1 : 1;
+        if (aVal > bVal) return ascending ? 1 : -1;
+        return 0;
+    });
+
+    rows.forEach(function(row) {
+        tbody.appendChild(row);
+    });
+}
+</script>';
+
+} else {
+    print '<div class="opacitymedium">'.$langs->trans('NoArchivesYet').'</div>';
+}
 
 llxFooter();
 $db->close();
