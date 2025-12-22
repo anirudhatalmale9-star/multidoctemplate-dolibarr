@@ -254,7 +254,8 @@ class MultiDocGenerator
 
     /**
      * Get substitution array for object
-     * Uses Dolibarr's native substitution system
+     * Uses Dolibarr's standard ODT/ODS substitution tags
+     * See: https://wiki.dolibarr.org/index.php/Create_an_ODT_or_ODS_document_template
      *
      * @param CommonObject $object Object
      * @param string $object_type Object type
@@ -266,69 +267,61 @@ class MultiDocGenerator
 
         $substitutions = array();
 
-        // Load complete_substitutions_array function if available
-        if (function_exists('complete_substitutions_array')) {
-            // Use Dolibarr's native substitution system
-            $tmparray = array();
+        // Use Dolibarr's standard substitution tags (lowercase with underscores)
+        // These match the official Dolibarr ODT template documentation
 
-            // Add object-specific substitutions
-            if ($object_type == 'thirdparty') {
-                complete_substitutions_array($tmparray, $langs, $object, null, 0, 'societe');
-            } else {
-                complete_substitutions_array($tmparray, $langs, $object, null, 0, 'contact');
-            }
-
-            // Convert to simple key => value
-            foreach ($tmparray as $key => $val) {
-                if (is_string($val)) {
-                    // Remove __xxx__ format
-                    $clean_key = preg_replace('/^__|__$/', '', $key);
-                    $substitutions[$clean_key] = $val;
-                    $substitutions[$key] = $val; // Keep original format too
-                }
-            }
-        }
-
-        // Add manual substitutions for common fields
         if ($object_type == 'thirdparty') {
-            $substitutions = array_merge($substitutions, $this->getThirdpartySubstitutions($object));
+            $substitutions = $this->getThirdpartySubstitutions($object);
         } else {
-            $substitutions = array_merge($substitutions, $this->getContactSubstitutions($object));
+            $substitutions = $this->getContactSubstitutions($object);
         }
 
-        // Add date/time substitutions
-        $substitutions['DATE_NOW'] = dol_print_date(dol_now(), 'day');
-        $substitutions['DATETIME_NOW'] = dol_print_date(dol_now(), 'dayhour');
-        $substitutions['YEAR'] = date('Y');
-        $substitutions['MONTH'] = date('m');
-        $substitutions['DAY'] = date('d');
-
-        // Add company substitutions
+        // Add mycompany substitutions (own company info)
         if (is_object($mysoc)) {
-            $substitutions['MYCOMPANY_NAME'] = $mysoc->name;
-            $substitutions['MYCOMPANY_ADDRESS'] = $mysoc->address;
-            $substitutions['MYCOMPANY_ZIP'] = $mysoc->zip;
-            $substitutions['MYCOMPANY_TOWN'] = $mysoc->town;
-            $substitutions['MYCOMPANY_COUNTRY'] = $mysoc->country;
-            $substitutions['MYCOMPANY_EMAIL'] = $mysoc->email;
-            $substitutions['MYCOMPANY_PHONE'] = $mysoc->phone;
-            $substitutions['MYCOMPANY_FAX'] = $mysoc->fax;
-            $substitutions['MYCOMPANY_WEB'] = $mysoc->url;
-            $substitutions['MYCOMPANY_SIRET'] = $mysoc->idprof1;
-            $substitutions['MYCOMPANY_SIREN'] = $mysoc->idprof2;
-            $substitutions['MYCOMPANY_VAT_INTRA'] = $mysoc->tva_intra;
+            $substitutions['mycompany_name'] = $mysoc->name;
+            $substitutions['mycompany_address'] = $mysoc->address;
+            $substitutions['mycompany_zip'] = $mysoc->zip;
+            $substitutions['mycompany_town'] = $mysoc->town;
+            $substitutions['mycompany_country'] = $mysoc->country;
+            $substitutions['mycompany_country_code'] = $mysoc->country_code;
+            $substitutions['mycompany_state'] = $mysoc->state;
+            $substitutions['mycompany_phone'] = $mysoc->phone;
+            $substitutions['mycompany_fax'] = $mysoc->fax;
+            $substitutions['mycompany_email'] = $mysoc->email;
+            $substitutions['mycompany_web'] = $mysoc->url;
+            $substitutions['mycompany_idprof1'] = $mysoc->idprof1;
+            $substitutions['mycompany_idprof2'] = $mysoc->idprof2;
+            $substitutions['mycompany_idprof3'] = $mysoc->idprof3;
+            $substitutions['mycompany_idprof4'] = $mysoc->idprof4;
+            $substitutions['mycompany_idprof5'] = $mysoc->idprof5;
+            $substitutions['mycompany_idprof6'] = $mysoc->idprof6;
+            $substitutions['mycompany_vatnumber'] = $mysoc->tva_intra;
+            $substitutions['mycompany_capital'] = $mysoc->capital;
+            $substitutions['mycompany_note_public'] = $mysoc->note_public;
+            $substitutions['mycompany_default_bank_iban'] = !empty($mysoc->bank_account) ? $mysoc->bank_account->iban : '';
+            $substitutions['mycompany_default_bank_bic'] = !empty($mysoc->bank_account) ? $mysoc->bank_account->bic : '';
         }
 
         // Add user substitutions
-        $substitutions['USER_LOGIN'] = $user->login;
-        $substitutions['USER_NAME'] = $user->getFullName($langs);
-        $substitutions['USER_EMAIL'] = $user->email;
+        $substitutions['user_login'] = $user->login;
+        $substitutions['user_firstname'] = $user->firstname;
+        $substitutions['user_lastname'] = $user->lastname;
+        $substitutions['user_fullname'] = $user->getFullName($langs);
+        $substitutions['user_email'] = $user->email;
+
+        // Add date/time substitutions
+        $substitutions['date'] = dol_print_date(dol_now(), 'day');
+        $substitutions['datehour'] = dol_print_date(dol_now(), 'dayhour');
+        $substitutions['year'] = date('Y');
+        $substitutions['month'] = date('m');
+        $substitutions['day'] = date('d');
 
         return $substitutions;
     }
 
     /**
      * Get thirdparty-specific substitutions
+     * Uses Dolibarr's standard {company_xxx} tags
      *
      * @param Societe $object Thirdparty object
      * @return array Substitutions
@@ -339,58 +332,69 @@ class MultiDocGenerator
 
         $subs = array();
 
-        // Basic info
-        $subs['THIRDPARTY_ID'] = $object->id;
-        $subs['THIRDPARTY_NAME'] = $object->name;
-        $subs['THIRDPARTY_NAME_ALIAS'] = $object->name_alias;
-        $subs['THIRDPARTY_ADDRESS'] = $object->address;
-        $subs['THIRDPARTY_ZIP'] = $object->zip;
-        $subs['THIRDPARTY_TOWN'] = $object->town;
-        $subs['THIRDPARTY_STATE'] = $object->state;
-        $subs['THIRDPARTY_COUNTRY'] = $object->country;
-        $subs['THIRDPARTY_COUNTRY_CODE'] = $object->country_code;
-
-        // Contact info
-        $subs['THIRDPARTY_PHONE'] = $object->phone;
-        $subs['THIRDPARTY_FAX'] = $object->fax;
-        $subs['THIRDPARTY_EMAIL'] = $object->email;
-        $subs['THIRDPARTY_WEB'] = $object->url;
-        $subs['THIRDPARTY_SKYPE'] = $object->skype;
-
-        // Legal info
-        $subs['THIRDPARTY_IDPROF1'] = $object->idprof1;
-        $subs['THIRDPARTY_IDPROF2'] = $object->idprof2;
-        $subs['THIRDPARTY_IDPROF3'] = $object->idprof3;
-        $subs['THIRDPARTY_IDPROF4'] = $object->idprof4;
-        $subs['THIRDPARTY_VAT_INTRA'] = $object->tva_intra;
-        $subs['THIRDPARTY_CAPITAL'] = $object->capital;
+        // Standard Dolibarr company/thirdparty substitution tags
+        // As documented in wiki.dolibarr.org ODT template guide
+        $subs['company_name'] = $object->name;
+        $subs['company_name_alias'] = $object->name_alias;
+        $subs['company_address'] = $object->address;
+        $subs['company_zip'] = $object->zip;
+        $subs['company_town'] = $object->town;
+        $subs['company_country'] = $object->country;
+        $subs['company_country_code'] = $object->country_code;
+        $subs['company_state'] = $object->state;
+        $subs['company_state_code'] = $object->state_code;
+        $subs['company_phone'] = $object->phone;
+        $subs['company_fax'] = $object->fax;
+        $subs['company_email'] = $object->email;
+        $subs['company_web'] = $object->url;
+        $subs['company_barcode'] = $object->barcode;
 
         // Codes
-        $subs['THIRDPARTY_CODE_CLIENT'] = $object->code_client;
-        $subs['THIRDPARTY_CODE_FOURNISSEUR'] = $object->code_fournisseur;
-        $subs['THIRDPARTY_CODE_COMPTA'] = $object->code_compta;
+        $subs['company_customercode'] = $object->code_client;
+        $subs['company_suppliercode'] = $object->code_fournisseur;
+        $subs['company_customeraccountancycode'] = $object->code_compta;
+        $subs['company_supplieraccountancycode'] = $object->code_compta_fournisseur;
 
-        // Status
-        $subs['THIRDPARTY_STATUS'] = $object->status;
+        // Legal/Professional IDs
+        $subs['company_idprof1'] = $object->idprof1;
+        $subs['company_idprof2'] = $object->idprof2;
+        $subs['company_idprof3'] = $object->idprof3;
+        $subs['company_idprof4'] = $object->idprof4;
+        $subs['company_idprof5'] = $object->idprof5;
+        $subs['company_idprof6'] = $object->idprof6;
+        $subs['company_vatnumber'] = $object->tva_intra;
+        $subs['company_capital'] = $object->capital;
+        $subs['company_juridicalstatus'] = $object->forme_juridique;
+        $subs['company_outstanding_limit'] = $object->outstanding_limit;
 
         // Notes
-        $subs['THIRDPARTY_NOTE_PUBLIC'] = $object->note_public;
-        $subs['THIRDPARTY_NOTE_PRIVATE'] = $object->note_private;
+        $subs['company_note_public'] = $object->note_public;
+        $subs['company_note_private'] = $object->note_private;
 
-        // Also add with simpler names for compatibility
-        $subs['COMPANY_NAME'] = $object->name;
-        $subs['COMPANY_ADDRESS'] = $object->address;
-        $subs['COMPANY_ZIP'] = $object->zip;
-        $subs['COMPANY_TOWN'] = $object->town;
-        $subs['COMPANY_COUNTRY'] = $object->country;
-        $subs['COMPANY_EMAIL'] = $object->email;
-        $subs['COMPANY_PHONE'] = $object->phone;
+        // Bank info (if loaded)
+        if (!empty($object->bank_account)) {
+            $subs['company_default_bank_iban'] = $object->bank_account->iban;
+            $subs['company_default_bank_bic'] = $object->bank_account->bic;
+        } else {
+            $subs['company_default_bank_iban'] = '';
+            $subs['company_default_bank_bic'] = '';
+        }
+
+        // Extra fields support: {company_options_xxx}
+        if (!empty($object->array_options)) {
+            foreach ($object->array_options as $key => $val) {
+                // Remove 'options_' prefix for cleaner tag names
+                $clean_key = preg_replace('/^options_/', '', $key);
+                $subs['company_options_'.$clean_key] = $val;
+            }
+        }
 
         return $subs;
     }
 
     /**
      * Get contact-specific substitutions
+     * Uses Dolibarr's standard {contact_xxx} tags
      *
      * @param Contact $object Contact object
      * @return array Substitutions
@@ -401,37 +405,58 @@ class MultiDocGenerator
 
         $subs = array();
 
-        // Basic info
-        $subs['CONTACT_ID'] = $object->id;
-        $subs['CONTACT_CIVILITY'] = $object->civility;
-        $subs['CONTACT_FIRSTNAME'] = $object->firstname;
-        $subs['CONTACT_LASTNAME'] = $object->lastname;
-        $subs['CONTACT_FULLNAME'] = $object->getFullName($langs);
-        $subs['CONTACT_POSTE'] = $object->poste;
+        // Standard Dolibarr contact substitution tags
+        $subs['contact_civility'] = $object->civility;
+        $subs['contact_firstname'] = $object->firstname;
+        $subs['contact_lastname'] = $object->lastname;
+        $subs['contact_fullname'] = $object->getFullName($langs);
+        $subs['contact_poste'] = $object->poste;
 
         // Address
-        $subs['CONTACT_ADDRESS'] = $object->address;
-        $subs['CONTACT_ZIP'] = $object->zip;
-        $subs['CONTACT_TOWN'] = $object->town;
-        $subs['CONTACT_STATE'] = $object->state;
-        $subs['CONTACT_COUNTRY'] = $object->country;
-        $subs['CONTACT_COUNTRY_CODE'] = $object->country_code;
+        $subs['contact_address'] = $object->address;
+        $subs['contact_zip'] = $object->zip;
+        $subs['contact_town'] = $object->town;
+        $subs['contact_state'] = $object->state;
+        $subs['contact_state_code'] = $object->state_code;
+        $subs['contact_country'] = $object->country;
+        $subs['contact_country_code'] = $object->country_code;
 
         // Contact info
-        $subs['CONTACT_PHONE_PRO'] = $object->phone_pro;
-        $subs['CONTACT_PHONE_PERSO'] = $object->phone_perso;
-        $subs['CONTACT_PHONE_MOBILE'] = $object->phone_mobile;
-        $subs['CONTACT_FAX'] = $object->fax;
-        $subs['CONTACT_EMAIL'] = $object->email;
-        $subs['CONTACT_SKYPE'] = $object->skype;
+        $subs['contact_phone'] = $object->phone_pro;
+        $subs['contact_phone_pro'] = $object->phone_pro;
+        $subs['contact_phone_perso'] = $object->phone_perso;
+        $subs['contact_phone_mobile'] = $object->phone_mobile;
+        $subs['contact_fax'] = $object->fax;
+        $subs['contact_email'] = $object->email;
 
         // Notes
-        $subs['CONTACT_NOTE_PUBLIC'] = $object->note_public;
-        $subs['CONTACT_NOTE_PRIVATE'] = $object->note_private;
+        $subs['contact_note_public'] = $object->note_public;
+        $subs['contact_note_private'] = $object->note_private;
 
         // Birthday
         if (!empty($object->birthday)) {
-            $subs['CONTACT_BIRTHDAY'] = dol_print_date($object->birthday, 'day');
+            $subs['contact_birthday'] = dol_print_date($object->birthday, 'day');
+        } else {
+            $subs['contact_birthday'] = '';
+        }
+
+        // If contact has a linked thirdparty, also include company tags
+        if (!empty($object->socid) && $object->socid > 0) {
+            require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+            $thirdparty = new Societe($this->db);
+            if ($thirdparty->fetch($object->socid) > 0) {
+                // Add company tags for the linked thirdparty
+                $company_subs = $this->getThirdpartySubstitutions($thirdparty);
+                $subs = array_merge($subs, $company_subs);
+            }
+        }
+
+        // Extra fields support: {contact_options_xxx}
+        if (!empty($object->array_options)) {
+            foreach ($object->array_options as $key => $val) {
+                $clean_key = preg_replace('/^options_/', '', $key);
+                $subs['contact_options_'.$clean_key] = $val;
+            }
         }
 
         return $subs;
