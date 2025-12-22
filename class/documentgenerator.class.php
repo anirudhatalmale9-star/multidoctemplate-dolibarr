@@ -136,11 +136,28 @@ class MultiDocGenerator
         }
 
         try {
+            // Determine temp directory - use module's temp dir or fallback to main temp
+            $temp_dir = '';
+            if (!empty($conf->multidoctemplate->dir_temp)) {
+                $temp_dir = $conf->multidoctemplate->dir_temp;
+            } else {
+                // Fallback to Dolibarr's main temp directory
+                $temp_dir = DOL_DATA_ROOT.'/multidoctemplate/temp';
+            }
+
+            // Create temp directory if it doesn't exist
+            if (!is_dir($temp_dir)) {
+                if (dol_mkdir($temp_dir) < 0) {
+                    $this->error = $langs->trans('ErrorCanNotCreateDir', $temp_dir);
+                    return -11;
+                }
+            }
+
             // Load ODT template
             $odfHandler = new Odf(
                 $template_path,
                 array(
-                    'PATH_TO_TMP' => $conf->multidoctemplate->dir_temp,
+                    'PATH_TO_TMP' => $temp_dir,
                     'ZIP_PROXY' => 'PclZipProxy',
                     'DELIMITER_LEFT' => '{',
                     'DELIMITER_RIGHT' => '}'
