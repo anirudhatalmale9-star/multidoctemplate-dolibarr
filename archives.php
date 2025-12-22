@@ -206,7 +206,7 @@ if ($action == 'delete') {
     print $formconfirm;
 }
 
-// Generate archive section
+// Generate archive section - File Explorer Style
 if ($user->hasRight('multidoctemplate', 'archive_creer')) {
     print '<div class="tabsAction">';
     print load_fiche_titre($langs->trans('GenerateArchive'), '', '');
@@ -215,62 +215,145 @@ if ($user->hasRight('multidoctemplate', 'archive_creer')) {
     $templates = $template->fetchAllForUser($user);
 
     if (is_array($templates) && count($templates) > 0) {
-        print '<form action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&object_type='.$object_type.'" method="POST">';
-        print '<input type="hidden" name="token" value="'.newToken().'">';
-        print '<input type="hidden" name="action" value="generate">';
-
-        print '<div class="fichecenter">';
-        print '<table class="noborder centpercent">';
-        print '<tr class="liste_titre">';
-        print '<th>'.$langs->trans('SelectTemplate').'</th>';
-        if (!empty($object_categories)) {
-            print '<th>'.$langs->trans('CategoryFilter').'</th>';
-        }
-        print '<th></th>';
-        print '</tr>';
-
-        print '<tr class="oddeven">';
-        print '<td>';
-        print '<select name="template_id" class="flat minwidth300">';
-        print '<option value="">'.$langs->trans('SelectATemplate').'</option>';
-        $current_tag = '';
+        // Group templates by tag
+        $templates_by_tag = array();
         foreach ($templates as $tpl) {
             $tag_label = !empty($tpl->tag) ? $tpl->tag : $langs->trans('NoTag');
-            if ($current_tag != $tag_label) {
-                if (!empty($current_tag)) {
-                    print '</optgroup>';
-                }
-                print '<optgroup label="'.dol_escape_htmltag($tag_label).'">';
-                $current_tag = $tag_label;
+            if (!isset($templates_by_tag[$tag_label])) {
+                $templates_by_tag[$tag_label] = array();
             }
-            print '<option value="'.$tpl->id.'">'.dol_escape_htmltag($tpl->label).' ('.strtoupper($tpl->filetype).')</option>';
+            $templates_by_tag[$tag_label][] = $tpl;
         }
-        if (!empty($current_tag)) {
-            print '</optgroup>';
-        }
-        print '</select>';
-        print '</td>';
+        ksort($templates_by_tag);
 
-        // Category filter dropdown
-        if (!empty($object_categories)) {
-            print '<td>';
-            print '<select name="category_id" class="flat minwidth200">';
-            print '<option value="">'.$langs->trans('NoFilter').'</option>';
-            foreach ($object_categories as $cat_id => $cat_label) {
-                print '<option value="'.$cat_id.'">'.dol_escape_htmltag($cat_label).'</option>';
-            }
-            print '</select>';
-            print '</td>';
-        }
-
-        print '<td>';
-        print '<input type="submit" class="button button-primary" value="'.$langs->trans('Generate').'">';
-        print '</td>';
-        print '</tr>';
-
-        print '</table>';
+        // Search box
+        print '<div class="marginbottomonly">';
+        print '<input type="text" id="template_search" class="flat minwidth200" placeholder="'.$langs->trans('Search').'..." onkeyup="filterTemplates()">';
+        print ' <a href="javascript:void(0)" onclick="expandAllFolders()">'.$langs->trans('ExpandAll').'</a>';
+        print ' | <a href="javascript:void(0)" onclick="collapseAllFolders()">'.$langs->trans('CollapseAll').'</a>';
         print '</div>';
+
+        print '<form action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&object_type='.$object_type.'" method="POST" id="generate_form">';
+        print '<input type="hidden" name="token" value="'.newToken().'">';
+        print '<input type="hidden" name="action" value="generate">';
+        print '<input type="hidden" name="template_id" id="selected_template_id" value="">';
+
+        // File explorer style container
+        print '<div id="template_explorer" class="div-table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background: #fafafa;">';
+
+        foreach ($templates_by_tag as $tag_label => $tag_templates) {
+            $tag_id = 'tag_'.md5($tag_label);
+            $count = count($tag_templates);
+
+            // Folder header (collapsible)
+            print '<div class="template-folder" data-tag="'.dol_escape_htmltag(strtolower($tag_label)).'">';
+            print '<div class="folder-header" onclick="toggleFolder(\''.$tag_id.'\')" style="cursor: pointer; padding: 8px; background: #e8e8e8; margin-bottom: 2px; border-radius: 3px;">';
+            print '<span id="'.$tag_id.'_icon" style="font-family: monospace;">[-]</span> ';
+            print '<strong>'.img_picto('', 'folder', 'style="vertical-align: middle;"').' '.dol_escape_htmltag($tag_label).'</strong>';
+            print ' <span class="opacitymedium">('.$count.')</span>';
+            print '</div>';
+
+            // Folder content (templates list)
+            print '<div id="'.$tag_id.'_content" class="folder-content" style="margin-left: 25px; display: block;">';
+            foreach ($tag_templates as $tpl) {
+                print '<div class="template-item" data-label="'.dol_escape_htmltag(strtolower($tpl->label)).'" style="padding: 5px; border-bottom: 1px solid #eee;">';
+                print '<a href="javascript:void(0)" onclick="selectTemplate('.$tpl->id.', \''.dol_escape_js($tpl->label).'\')" style="text-decoration: none;">';
+                print img_picto('', 'file', 'style="vertical-align: middle;"').' ';
+                print '<span class="template-label">'.dol_escape_htmltag($tpl->label).'</span>';
+                print ' <span class="opacitymedium">('.strtoupper($tpl->filetype).')</span>';
+                print '</a>';
+                print '</div>';
+            }
+            print '</div>'; // folder-content
+            print '</div>'; // template-folder
+        }
+
+        print '</div>'; // template_explorer
+
+        // Selected template display and generate button
+        print '<div class="margintoponlyonly" style="margin-top: 15px;">';
+        print '<strong>'.$langs->trans('Selected').':</strong> <span id="selected_template_name" class="opacitymedium">'.$langs->trans('None').'</span>';
+        print ' &nbsp; ';
+        print '<input type="submit" class="button button-primary" value="'.$langs->trans('Generate').'" id="generate_btn" disabled>';
+        print '</div>';
+
         print '</form>';
+
+        // JavaScript for file explorer functionality
+        print '<script type="text/javascript">
+function toggleFolder(tagId) {
+    var content = document.getElementById(tagId + "_content");
+    var icon = document.getElementById(tagId + "_icon");
+    if (content.style.display === "none") {
+        content.style.display = "block";
+        icon.innerHTML = "[-]";
+    } else {
+        content.style.display = "none";
+        icon.innerHTML = "[+]";
+    }
+}
+
+function expandAllFolders() {
+    var contents = document.querySelectorAll(".folder-content");
+    var icons = document.querySelectorAll("[id$=\'_icon\']");
+    contents.forEach(function(el) { el.style.display = "block"; });
+    icons.forEach(function(el) { el.innerHTML = "[-]"; });
+}
+
+function collapseAllFolders() {
+    var contents = document.querySelectorAll(".folder-content");
+    var icons = document.querySelectorAll("[id$=\'_icon\']");
+    contents.forEach(function(el) { el.style.display = "none"; });
+    icons.forEach(function(el) { el.innerHTML = "[+]"; });
+}
+
+function selectTemplate(id, label) {
+    document.getElementById("selected_template_id").value = id;
+    document.getElementById("selected_template_name").innerHTML = label;
+    document.getElementById("selected_template_name").className = "";
+    document.getElementById("generate_btn").disabled = false;
+    // Highlight selected
+    var items = document.querySelectorAll(".template-item");
+    items.forEach(function(el) { el.style.background = ""; });
+    event.target.closest(".template-item").style.background = "#d4edda";
+}
+
+function filterTemplates() {
+    var search = document.getElementById("template_search").value.toLowerCase();
+    var folders = document.querySelectorAll(".template-folder");
+
+    folders.forEach(function(folder) {
+        var items = folder.querySelectorAll(".template-item");
+        var hasVisible = false;
+
+        items.forEach(function(item) {
+            var label = item.getAttribute("data-label");
+            if (label.indexOf(search) > -1 || search === "") {
+                item.style.display = "block";
+                hasVisible = true;
+            } else {
+                item.style.display = "none";
+            }
+        });
+
+        // Show/hide folder based on whether it has visible items
+        var tag = folder.getAttribute("data-tag");
+        if (hasVisible || tag.indexOf(search) > -1 || search === "") {
+            folder.style.display = "block";
+            // Expand folder when searching
+            if (search !== "") {
+                var content = folder.querySelector(".folder-content");
+                var icon = folder.querySelector("[id$=\'_icon\']");
+                if (content) content.style.display = "block";
+                if (icon) icon.innerHTML = "[-]";
+            }
+        } else {
+            folder.style.display = "none";
+        }
+    });
+}
+</script>';
+
     } else {
         print '<div class="opacitymedium">'.$langs->trans('NoTemplatesAvailable').'</div>';
     }
