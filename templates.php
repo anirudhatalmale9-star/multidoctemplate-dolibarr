@@ -110,6 +110,7 @@ if ($action == 'upload' && $user->hasRight('multidoctemplate', 'template_creer')
                 $template->ref = 'TPL-'.$object->id.'-'.date('YmdHis');
                 $template->label = GETPOST('template_label', 'alphanohtml') ?: pathinfo($filename, PATHINFO_FILENAME);
                 $template->description = GETPOST('template_description', 'restricthtml');
+                $template->tag = GETPOST('template_tag', 'alphanohtml');
                 $template->fk_usergroup = $object->id;
                 $template->filename = $sanitized_filename;
                 $template->filepath = $filepath;
@@ -204,16 +205,22 @@ if ($user->hasRight('multidoctemplate', 'template_creer')) {
     print '<th colspan="2">'.$langs->trans('UploadNewTemplate').'</th>';
     print '</tr>';
 
+    // Tag (folder)
+    print '<tr class="oddeven">';
+    print '<td class="titlefield">'.$langs->trans('Tag').' <span class="star">*</span></td>';
+    print '<td><input type="text" name="template_tag" size="40" class="flat" placeholder="e.g. course, exam, credential" required></td>';
+    print '</tr>';
+
     // Label
     print '<tr class="oddeven">';
-    print '<td class="titlefield">'.$langs->trans('Label').'</td>';
+    print '<td>'.$langs->trans('Label').'</td>';
     print '<td><input type="text" name="template_label" size="40" class="flat"></td>';
     print '</tr>';
 
     // Description
     print '<tr class="oddeven">';
     print '<td>'.$langs->trans('Description').'</td>';
-    print '<td><textarea name="template_description" rows="3" cols="40" class="flat"></textarea></td>';
+    print '<td><textarea name="template_description" rows="2" cols="40" class="flat"></textarea></td>';
     print '</tr>';
 
     // File
@@ -245,13 +252,10 @@ $templates = $template->fetchAllByUserGroup($object->id, -1);
 print '<div class="div-table-responsive">';
 print '<table class="noborder centpercent">';
 print '<tr class="liste_titre">';
-print '<th>'.$langs->trans('Ref').'</th>';
+print '<th>'.$langs->trans('Tag').'</th>';
 print '<th>'.$langs->trans('Label').'</th>';
 print '<th>'.$langs->trans('Filename').'</th>';
 print '<th>'.$langs->trans('Type').'</th>';
-print '<th class="right">'.$langs->trans('Size').'</th>';
-print '<th class="center">'.$langs->trans('DateCreation').'</th>';
-print '<th class="center">'.$langs->trans('Status').'</th>';
 print '<th class="center">'.$langs->trans('Actions').'</th>';
 print '</tr>';
 
@@ -259,8 +263,8 @@ if (is_array($templates) && count($templates) > 0) {
     foreach ($templates as $tpl) {
         print '<tr class="oddeven">';
 
-        // Ref
-        print '<td>'.$tpl->ref.'</td>';
+        // Tag
+        print '<td><span class="badge badge-secondary">'.dol_escape_htmltag($tpl->tag ?: '-').'</span></td>';
 
         // Label
         print '<td>'.dol_escape_htmltag($tpl->label).'</td>';
@@ -279,21 +283,6 @@ if (is_array($templates) && count($templates) > 0) {
         // Type
         print '<td>'.strtoupper($tpl->filetype).'</td>';
 
-        // Size
-        print '<td class="right">'.dol_print_size($tpl->filesize).'</td>';
-
-        // Date creation
-        print '<td class="center">'.dol_print_date($tpl->date_creation, 'dayhour').'</td>';
-
-        // Status
-        print '<td class="center">';
-        if ($tpl->active) {
-            print '<span class="badge badge-status4">'.$langs->trans('Enabled').'</span>';
-        } else {
-            print '<span class="badge badge-status5">'.$langs->trans('Disabled').'</span>';
-        }
-        print '</td>';
-
         // Actions
         print '<td class="center nowraponall">';
         if ($user->hasRight('multidoctemplate', 'template_supprimer')) {
@@ -306,7 +295,7 @@ if (is_array($templates) && count($templates) > 0) {
         print '</tr>';
     }
 } else {
-    print '<tr class="oddeven"><td colspan="8" class="opacitymedium">'.$langs->trans('NoTemplatesYet').'</td></tr>';
+    print '<tr class="oddeven"><td colspan="5" class="opacitymedium">'.$langs->trans('NoTemplatesYet').'</td></tr>';
 }
 
 print '</table>';

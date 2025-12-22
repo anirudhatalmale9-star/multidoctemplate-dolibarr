@@ -52,8 +52,11 @@ class MultiDocGenerator
             return -1;
         }
 
+        // Use template's tag for folder organization if no tag_filter provided
+        $folder_tag = !empty($tag_filter) ? $tag_filter : (!empty($template->tag) ? $template->tag : '');
+
         // Create archive directory
-        $archive_dir = MultiDocArchive::getArchiveDir($object_type, $object->id, $tag_filter);
+        $archive_dir = MultiDocArchive::getArchiveDir($object_type, $object->id, $folder_tag);
         if (!is_dir($archive_dir)) {
             if (dol_mkdir($archive_dir) < 0) {
                 $this->error = $langs->trans('ErrorCanNotCreateDir', $archive_dir);
@@ -96,7 +99,7 @@ class MultiDocGenerator
         $archive->filepath = $output_filepath;
         $archive->filetype = strtolower($ext);
         $archive->filesize = filesize($output_filepath);
-        $archive->tag_filter = $tag_filter;
+        $archive->tag_filter = $folder_tag;
 
         $result = $archive->create($user);
 

@@ -233,18 +233,19 @@ if ($user->hasRight('multidoctemplate', 'archive_creer')) {
         print '<td>';
         print '<select name="template_id" class="flat minwidth300">';
         print '<option value="">'.$langs->trans('SelectATemplate').'</option>';
-        $current_group = '';
+        $current_tag = '';
         foreach ($templates as $tpl) {
-            if ($current_group != $tpl->usergroup_name) {
-                if (!empty($current_group)) {
+            $tag_label = !empty($tpl->tag) ? $tpl->tag : $langs->trans('NoTag');
+            if ($current_tag != $tag_label) {
+                if (!empty($current_tag)) {
                     print '</optgroup>';
                 }
-                print '<optgroup label="'.dol_escape_htmltag($tpl->usergroup_name).'">';
-                $current_group = $tpl->usergroup_name;
+                print '<optgroup label="'.dol_escape_htmltag($tag_label).'">';
+                $current_tag = $tag_label;
             }
             print '<option value="'.$tpl->id.'">'.dol_escape_htmltag($tpl->label).' ('.strtoupper($tpl->filetype).')</option>';
         }
-        if (!empty($current_group)) {
+        if (!empty($current_tag)) {
             print '</optgroup>';
         }
         print '</select>';
@@ -286,27 +287,27 @@ $archives = $archive->fetchAllByObject($object_type, $object->id);
 print '<div class="div-table-responsive">';
 print '<table class="noborder centpercent">';
 print '<tr class="liste_titre">';
-print '<th>'.$langs->trans('Ref').'</th>';
-print '<th>'.$langs->trans('Template').'</th>';
+print '<th>'.$langs->trans('Tag').'</th>';
 print '<th>'.$langs->trans('Filename').'</th>';
-print '<th>'.$langs->trans('Type').'</th>';
-print '<th class="right">'.$langs->trans('Size').'</th>';
-print '<th>'.$langs->trans('TagFilter').'</th>';
 print '<th class="center">'.$langs->trans('DateGeneration').'</th>';
 print '<th class="center">'.$langs->trans('Actions').'</th>';
 print '</tr>';
 
 if (is_array($archives) && count($archives) > 0) {
+    $current_tag = null;
     foreach ($archives as $arch) {
+        // Show tag separator row when tag changes
+        $tag_display = !empty($arch->template_tag) ? $arch->template_tag : $langs->trans('NoTag');
+        if ($current_tag !== $tag_display) {
+            $current_tag = $tag_display;
+        }
+
         print '<tr class="oddeven">';
 
-        // Ref
-        print '<td>'.$arch->ref.'</td>';
+        // Tag
+        print '<td><span class="badge badge-secondary">'.dol_escape_htmltag($tag_display).'</span></td>';
 
-        // Template
-        print '<td>'.dol_escape_htmltag($arch->template_label).'</td>';
-
-        // Filename
+        // Filename (with download link)
         print '<td>';
         if (file_exists($arch->filepath)) {
             $relative_path = str_replace(DOL_DATA_ROOT.'/multidoctemplate/', '', $arch->filepath);
@@ -318,23 +319,8 @@ if (is_array($archives) && count($archives) > 0) {
         }
         print '</td>';
 
-        // Type
-        print '<td>'.strtoupper($arch->filetype).'</td>';
-
-        // Size
-        print '<td class="right">'.dol_print_size($arch->filesize).'</td>';
-
-        // Tag filter
-        print '<td>';
-        if (!empty($arch->tag_filter)) {
-            print '<span class="badge badge-secondary">'.dol_escape_htmltag($arch->tag_filter).'</span>';
-        } else {
-            print '-';
-        }
-        print '</td>';
-
         // Date generation
-        print '<td class="center">'.dol_print_date($arch->date_generation, 'dayhour').'</td>';
+        print '<td class="center">'.dol_print_date($arch->date_generation, 'day').'</td>';
 
         // Actions
         print '<td class="center nowraponall">';
@@ -356,7 +342,7 @@ if (is_array($archives) && count($archives) > 0) {
         print '</tr>';
     }
 } else {
-    print '<tr class="oddeven"><td colspan="8" class="opacitymedium">'.$langs->trans('NoArchivesYet').'</td></tr>';
+    print '<tr class="oddeven"><td colspan="4" class="opacitymedium">'.$langs->trans('NoArchivesYet').'</td></tr>';
 }
 
 print '</table>';
