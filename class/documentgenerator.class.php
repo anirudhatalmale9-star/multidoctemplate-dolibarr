@@ -241,14 +241,112 @@ class MultiDocGenerator
      */
     protected function processDOCX($template_path, $output_path, $object, $object_type)
     {
-        // DOCX files are ZIP archives with XML content in word/document.xml
-        return $this->processZipXML($template_path, $output_path, $object, $object_type, array(
+        global $langs;
+
+        if (!class_exists('ZipArchive')) {
+            $this->error = 'ZipArchive class not available';
+            return $this->processCopy($template_path, $output_path, $object, $object_type);
+        }
+
+        // Copy template to output location first
+        if (!dol_copy($template_path, $output_path, 0, 1)) {
+            $this->error = $langs->trans('ErrorFileCopyFailed');
+            return -20;
+        }
+
+        // Open the copied file for modification
+        $zip = new ZipArchive();
+        if ($zip->open($output_path) !== true) {
+            $this->error = $langs->trans('ErrorCanNotOpenFile', $output_path);
+            return -21;
+        }
+
+        // Get substitution array
+        $substitutions = $this->getSubstitutionArray($object, $object_type);
+
+        // DOCX files to process
+        $xml_files = array(
             'word/document.xml',
             'word/header1.xml',
             'word/header2.xml',
+            'word/header3.xml',
             'word/footer1.xml',
-            'word/footer2.xml'
-        ));
+            'word/footer2.xml',
+            'word/footer3.xml'
+        );
+
+        foreach ($xml_files as $xml_file) {
+            $content = $zip->getFromName($xml_file);
+            if ($content !== false) {
+                // Clean up split XML runs - Word often splits {variable} into multiple <w:t> tags
+                // This regex merges adjacent <w:t> tags within the same paragraph
+                $content = $this->cleanDocxXml($content);
+
+                // Replace variables in content
+                foreach ($substitutions as $key => $value) {
+                    if ($value === null) {
+                        $value = '';
+                    }
+                    $content = str_replace('{'.$key.'}', htmlspecialchars($value, ENT_XML1, 'UTF-8'), $content);
+                }
+
+                // Update the file in the ZIP
+                $zip->deleteName($xml_file);
+                $zip->addFromString($xml_file, $content);
+            }
+        }
+
+        $zip->close();
+
+        return 1;
+    }
+
+    /**
+     * Clean DOCX XML by merging split text runs
+     * Word often splits text like {company_name} into multiple <w:t> elements
+     *
+     * @param string $content XML content
+     * @return string Cleaned XML content
+     */
+    protected function cleanDocxXml($content)
+    {
+        // Pattern to find variables that might be split across runs
+        // Look for patterns like </w:t></w:r><w:r><w:t> or </w:t></w:r><w:r...><w:t>
+        // and merge them when they contain parts of our {variable} tags
+
+        // First, let's try to find and fix split curly braces
+        // Match text between { and } that might span multiple runs
+        $pattern = '/\{([^}]*?)(<\/w:t><\/w:r>.*?<w:r[^>]*>.*?<w:t[^>]*>)+([^}]*?)\}/s';
+
+        $content = preg_replace_callback($pattern, function($matches) {
+            // Remove all XML tags between the braces, keep only text
+            $inner = $matches[1] . $matches[2] . $matches[3];
+            $inner = preg_replace('/<[^>]+>/', '', $inner);
+            return '{'.$inner.'}';
+        }, $content);
+
+        // Also handle simpler cases where just the variable name is split
+        // Pattern: {text</w:t></w:r><w:r><w:t>more_text}
+        $content = preg_replace_callback(
+            '/(\{[^}<]*)<\/w:t><\/w:r>(<w:r[^>]*>)?<w:t[^>]*>([^}]*\})/s',
+            function($matches) {
+                return $matches[1] . $matches[3];
+            },
+            $content
+        );
+
+        // Repeat a few times to catch nested splits
+        for ($i = 0; $i < 5; $i++) {
+            $content = preg_replace_callback(
+                '/(\{[^}<]*)<\/w:t><\/w:r>(<w:r[^>]*>)?<w:t[^>]*>([^}]*\})/s',
+                function($matches) {
+                    return $matches[1] . $matches[3];
+                },
+                $content
+            );
+        }
+
+        return $content;
     }
 
     /**
@@ -410,6 +508,12 @@ class MultiDocGenerator
             $substitutions['mycompany_note_public'] = $mysoc->note_public;
             $substitutions['mycompany_default_bank_iban'] = !empty($mysoc->bank_account) ? $mysoc->bank_account->iban : '';
             $substitutions['mycompany_default_bank_bic'] = !empty($mysoc->bank_account) ? $mysoc->bank_account->bic : '';
+
+            // My company logo URL
+            $substitutions['mycompany_logo'] = '';
+            if (!empty($mysoc->logo)) {
+                $substitutions['mycompany_logo'] = DOL_URL_ROOT.'/viewimage.php?modulepart=mycompany&entity='.$conf->entity.'&file='.urlencode('logos/'.$mysoc->logo);
+            }
         }
 
         // Add logged-in user substitutions (complete user info)
@@ -534,6 +638,13 @@ class MultiDocGenerator
             }
         }
 
+        // Company logo URL
+        global $conf;
+        $subs['company_logo'] = '';
+        if (!empty($object->logo)) {
+            $subs['company_logo'] = DOL_URL_ROOT.'/viewimage.php?modulepart=societe&entity='.$conf->entity.'&file='.urlencode($object->id.'/logos/'.$object->logo);
+        }
+
         return $subs;
     }
 
@@ -611,6 +722,13 @@ class MultiDocGenerator
                 $clean_key = preg_replace('/^options_/', '', $key);
                 $subs['contact_options_'.$clean_key] = $val;
             }
+        }
+
+        // Contact photo URL
+        global $conf;
+        $subs['contact_photo'] = '';
+        if (!empty($object->photo)) {
+            $subs['contact_photo'] = DOL_URL_ROOT.'/viewimage.php?modulepart=contact&entity='.$conf->entity.'&file='.urlencode($object->id.'/photos/'.$object->photo);
         }
 
         return $subs;

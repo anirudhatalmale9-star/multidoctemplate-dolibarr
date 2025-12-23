@@ -407,13 +407,18 @@ if (is_array($archives) && count($archives) > 0) {
         // Table header for this folder
         print '<table class="noborder centpercent" style="margin-bottom: 10px;">';
         print '<tr class="liste_titre">';
-        print '<th class="sortable" onclick="sortArchiveTable(\''.$tag_id.'\', 0)" style="cursor: pointer;">'.$langs->trans('Filename').' ↕</th>';
-        print '<th class="center sortable" onclick="sortArchiveTable(\''.$tag_id.'\', 1)" style="cursor: pointer;">'.$langs->trans('DateGeneration').' ↕</th>';
+        print '<th class="sortable" onclick="sortArchiveTable(\''.$tag_id.'\', 0)" style="cursor: pointer;">'.$langs->trans('Label').' ↕</th>';
+        print '<th class="sortable" onclick="sortArchiveTable(\''.$tag_id.'\', 1)" style="cursor: pointer;">'.$langs->trans('Filename').' ↕</th>';
+        print '<th class="center sortable" onclick="sortArchiveTable(\''.$tag_id.'\', 2)" style="cursor: pointer;">'.$langs->trans('DateGeneration').' ↕</th>';
         print '<th class="center">'.$langs->trans('Actions').'</th>';
         print '</tr>';
 
         foreach ($tag_archives as $arch) {
-            print '<tr class="oddeven archive-row" data-filename="'.dol_escape_htmltag(strtolower($arch->filename)).'" data-date="'.$arch->date_generation.'">';
+            $label_display = !empty($arch->template_label) ? $arch->template_label : '-';
+            print '<tr class="oddeven archive-row" data-label="'.dol_escape_htmltag(strtolower($label_display)).'" data-filename="'.dol_escape_htmltag(strtolower($arch->filename)).'" data-date="'.$arch->date_generation.'">';
+
+            // Label (template label)
+            print '<td><strong>'.dol_escape_htmltag($label_display).'</strong></td>';
 
             // Filename (with download link)
             print '<td>';
@@ -530,6 +535,9 @@ function sortArchiveTable(tagId, colIndex) {
     rows.sort(function(a, b) {
         var aVal, bVal;
         if (colIndex === 0) {
+            aVal = a.getAttribute("data-label");
+            bVal = b.getAttribute("data-label");
+        } else if (colIndex === 1) {
             aVal = a.getAttribute("data-filename");
             bVal = b.getAttribute("data-filename");
         } else {
