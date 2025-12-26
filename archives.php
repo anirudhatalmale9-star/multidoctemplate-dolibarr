@@ -229,8 +229,8 @@ if ($user->hasRight('multidoctemplate', 'archive_creer')) {
         // Search box
         print '<div class="marginbottomonly">';
         print '<input type="text" id="template_search" class="flat minwidth200" placeholder="'.$langs->trans('Search').'..." onkeyup="filterTemplates()">';
-        print ' <a href="javascript:void(0)" onclick="expandAllFolders()">'.$langs->trans('ExpandAll').'</a>';
-        print ' | <a href="javascript:void(0)" onclick="collapseAllFolders()">'.$langs->trans('CollapseAll').'</a>';
+        print ' <a href="javascript:void(0)" onclick="expandAllFolders()" title="'.$langs->trans('ExpandAll').'">'.img_picto($langs->trans('ExpandAll'), 'folder-open').'</a>';
+        print ' <a href="javascript:void(0)" onclick="collapseAllFolders()" title="'.$langs->trans('CollapseAll').'">'.img_picto($langs->trans('CollapseAll'), 'folder').'</a>';
         print '</div>';
 
         print '<form action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&object_type='.$object_type.'" method="POST" id="generate_form">';
@@ -248,8 +248,8 @@ if ($user->hasRight('multidoctemplate', 'archive_creer')) {
             // Folder header (collapsible)
             print '<div class="template-folder" data-tag="'.dol_escape_htmltag(strtolower($tag_label)).'">';
             print '<div class="folder-header" onclick="toggleFolder(\''.$tag_id.'\')" style="cursor: pointer; padding: 8px; background: #e8e8e8; margin-bottom: 2px; border-radius: 3px;">';
-            print '<span id="'.$tag_id.'_icon" style="font-family: monospace;">[-]</span> ';
-            print '<strong>'.img_picto('', 'folder', 'style="vertical-align: middle;"').' '.dol_escape_htmltag($tag_label).'</strong>';
+            print '<span id="'.$tag_id.'_icon">'.img_picto('', 'folder-open').'</span> ';
+            print '<strong>'.dol_escape_htmltag($tag_label).'</strong>';
             print ' <span class="opacitymedium">('.$count.')</span>';
             print '</div>';
 
@@ -262,6 +262,10 @@ if ($user->hasRight('multidoctemplate', 'archive_creer')) {
                 print '<span class="template-label">'.dol_escape_htmltag($tpl->label).'</span>';
                 print ' <span class="opacitymedium">('.strtoupper($tpl->filetype).')</span>';
                 print '</a>';
+                // Info icon with description tooltip
+                if (!empty($tpl->description)) {
+                    print ' '.img_picto(dol_escape_htmltag($tpl->description), 'info', 'style="vertical-align: middle; cursor: help;"');
+                }
                 print '</div>';
             }
             print '</div>'; // folder-content
@@ -280,16 +284,21 @@ if ($user->hasRight('multidoctemplate', 'archive_creer')) {
         print '</form>';
 
         // JavaScript for file explorer functionality
+        $folder_open_icon = img_picto('', 'folder-open');
+        $folder_closed_icon = img_picto('', 'folder');
         print '<script type="text/javascript">
+var folderOpenIcon = \''.dol_escape_js($folder_open_icon).'\';
+var folderClosedIcon = \''.dol_escape_js($folder_closed_icon).'\';
+
 function toggleFolder(tagId) {
     var content = document.getElementById(tagId + "_content");
     var icon = document.getElementById(tagId + "_icon");
     if (content.style.display === "none") {
         content.style.display = "block";
-        icon.innerHTML = "[-]";
+        icon.innerHTML = folderOpenIcon;
     } else {
         content.style.display = "none";
-        icon.innerHTML = "[+]";
+        icon.innerHTML = folderClosedIcon;
     }
 }
 
@@ -297,14 +306,14 @@ function expandAllFolders() {
     var contents = document.querySelectorAll(".folder-content");
     var icons = document.querySelectorAll("[id$=\'_icon\']");
     contents.forEach(function(el) { el.style.display = "block"; });
-    icons.forEach(function(el) { el.innerHTML = "[-]"; });
+    icons.forEach(function(el) { el.innerHTML = folderOpenIcon; });
 }
 
 function collapseAllFolders() {
     var contents = document.querySelectorAll(".folder-content");
     var icons = document.querySelectorAll("[id$=\'_icon\']");
     contents.forEach(function(el) { el.style.display = "none"; });
-    icons.forEach(function(el) { el.innerHTML = "[+]"; });
+    icons.forEach(function(el) { el.innerHTML = folderClosedIcon; });
 }
 
 function selectTemplate(id, label) {
@@ -345,7 +354,7 @@ function filterTemplates() {
                 var content = folder.querySelector(".folder-content");
                 var icon = folder.querySelector("[id$=\'_icon\']");
                 if (content) content.style.display = "block";
-                if (icon) icon.innerHTML = "[-]";
+                if (icon) icon.innerHTML = folderOpenIcon;
             }
         } else {
             folder.style.display = "none";
@@ -382,8 +391,8 @@ if (is_array($archives) && count($archives) > 0) {
     // Search and controls
     print '<div class="marginbottomonly">';
     print '<input type="text" id="archive_search" class="flat minwidth200" placeholder="'.$langs->trans('Search').'..." onkeyup="filterArchives()">';
-    print ' <a href="javascript:void(0)" onclick="expandAllArchiveFolders()">'.$langs->trans('ExpandAll').'</a>';
-    print ' | <a href="javascript:void(0)" onclick="collapseAllArchiveFolders()">'.$langs->trans('CollapseAll').'</a>';
+    print ' <a href="javascript:void(0)" onclick="expandAllArchiveFolders()" title="'.$langs->trans('ExpandAll').'">'.img_picto($langs->trans('ExpandAll'), 'folder-open').'</a>';
+    print ' <a href="javascript:void(0)" onclick="collapseAllArchiveFolders()" title="'.$langs->trans('CollapseAll').'">'.img_picto($langs->trans('CollapseAll'), 'folder').'</a>';
     print '</div>';
 
     // File explorer style container
@@ -396,8 +405,8 @@ if (is_array($archives) && count($archives) > 0) {
         // Folder header (collapsible)
         print '<div class="archive-folder" data-tag="'.dol_escape_htmltag(strtolower($tag_label)).'">';
         print '<div class="folder-header" onclick="toggleArchiveFolder(\''.$tag_id.'\')" style="cursor: pointer; padding: 8px; background: #e8e8e8; margin-bottom: 2px; border-radius: 3px;">';
-        print '<span id="'.$tag_id.'_icon" style="font-family: monospace;">[-]</span> ';
-        print '<strong>'.img_picto('', 'folder', 'style="vertical-align: middle;"').' '.dol_escape_htmltag($tag_label).'</strong>';
+        print '<span id="'.$tag_id.'_icon">'.img_picto('', 'folder-open').'</span> ';
+        print '<strong>'.dol_escape_htmltag($tag_label).'</strong>';
         print ' <span class="opacitymedium">('.$count.' '.$langs->trans('Files').')</span>';
         print '</div>';
 
@@ -467,10 +476,10 @@ function toggleArchiveFolder(tagId) {
     var icon = document.getElementById(tagId + "_icon");
     if (content.style.display === "none") {
         content.style.display = "block";
-        icon.innerHTML = "[-]";
+        icon.innerHTML = folderOpenIcon;
     } else {
         content.style.display = "none";
-        icon.innerHTML = "[+]";
+        icon.innerHTML = folderClosedIcon;
     }
 }
 
@@ -478,14 +487,14 @@ function expandAllArchiveFolders() {
     var contents = document.querySelectorAll(".archive-folder-content");
     var icons = document.querySelectorAll("[id^=\'arch_tag_\'][id$=\'_icon\']");
     contents.forEach(function(el) { el.style.display = "block"; });
-    icons.forEach(function(el) { el.innerHTML = "[-]"; });
+    icons.forEach(function(el) { el.innerHTML = folderOpenIcon; });
 }
 
 function collapseAllArchiveFolders() {
     var contents = document.querySelectorAll(".archive-folder-content");
     var icons = document.querySelectorAll("[id^=\'arch_tag_\'][id$=\'_icon\']");
     contents.forEach(function(el) { el.style.display = "none"; });
-    icons.forEach(function(el) { el.innerHTML = "[+]"; });
+    icons.forEach(function(el) { el.innerHTML = folderClosedIcon; });
 }
 
 function filterArchives() {
@@ -513,7 +522,7 @@ function filterArchives() {
                 var content = folder.querySelector(".archive-folder-content");
                 var icon = folder.querySelector("[id$=\'_icon\']");
                 if (content) content.style.display = "block";
-                if (icon) icon.innerHTML = "[-]";
+                if (icon) icon.innerHTML = folderOpenIcon;
             }
         } else {
             folder.style.display = "none";
