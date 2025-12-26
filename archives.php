@@ -148,6 +148,66 @@ if ($action == 'generate' && $template_id > 0 && $user->hasRight('multidoctempla
     exit;
 }
 
+// Direct file upload
+if ($action == 'directupload' && $user->hasRight('multidoctemplate', 'archive_creer')) {
+    if (!empty($_FILES['directfile']['name'])) {
+        $filename = $_FILES['directfile']['name'];
+        $upload_tag = GETPOST('upload_tag', 'alphanohtml');
+        $upload_label = GETPOST('upload_label', 'alphanohtml');
+
+        if (empty($upload_tag)) {
+            setEventMessages($langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('Tag')), null, 'errors');
+        } else {
+            // Get upload directory
+            $upload_dir = MultiDocArchive::getArchiveDir($object_type, $object->id, $upload_tag);
+
+            // Create directory if not exists
+            if (!is_dir($upload_dir)) {
+                dol_mkdir($upload_dir);
+            }
+
+            // Sanitize filename
+            $sanitized_filename = dol_sanitizeFileName($filename);
+            // Add timestamp to avoid conflicts
+            $basename = pathinfo($sanitized_filename, PATHINFO_FILENAME);
+            $extension = pathinfo($sanitized_filename, PATHINFO_EXTENSION);
+            $final_filename = $basename.'_'.date('YmdHis').'.'.$extension;
+            $filepath = $upload_dir.'/'.$final_filename;
+
+            // Move uploaded file
+            if (dol_move_uploaded_file($_FILES['directfile']['tmp_name'], $filepath, 1, 0, $_FILES['directfile']['error']) > 0) {
+                // Create archive record
+                $archive->ref = MultiDocArchive::generateRef($object_type, $object->id);
+                $archive->fk_template = 0;  // No template - direct upload
+                $archive->object_type = $object_type;
+                $archive->object_id = $object->id;
+                $archive->filename = $final_filename;
+                $archive->filepath = $filepath;
+                $archive->filetype = strtolower($extension);
+                $archive->filesize = filesize($filepath);
+                $archive->tag_filter = $upload_tag;
+
+                $result = $archive->create($user);
+
+                if ($result > 0) {
+                    setEventMessages($langs->trans('FileUploadedSuccessfully'), null, 'mesgs');
+                } else {
+                    // Delete file if DB insert failed
+                    dol_delete_file($filepath);
+                    setEventMessages($archive->error, null, 'errors');
+                }
+            } else {
+                setEventMessages($langs->trans('ErrorFileUploadFailed'), null, 'errors');
+            }
+        }
+    } else {
+        setEventMessages($langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('File')), null, 'errors');
+    }
+
+    header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id.'&object_type='.$object_type);
+    exit;
+}
+
 // Delete archive
 if ($action == 'confirm_delete' && $confirm == 'yes' && $user->hasRight('multidoctemplate', 'archive_supprimer')) {
     if ($archive_id > 0) {
@@ -370,6 +430,47 @@ function filterTemplates() {
     print '</div>';
 }
 
+// Direct Upload Form
+if ($user->hasRight('multidoctemplate', 'archive_creer')) {
+    print '<div class="tabsAction">';
+    print load_fiche_titre($langs->trans('UploadFileDirectly'), '', 'upload');
+
+    print '<form enctype="multipart/form-data" action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&object_type='.$object_type.'" method="POST">';
+    print '<input type="hidden" name="token" value="'.newToken().'">';
+    print '<input type="hidden" name="action" value="directupload">';
+
+    print '<div class="fichecenter">';
+    print '<table class="noborder centpercent">';
+
+    // Tag (folder)
+    print '<tr class="oddeven">';
+    print '<td class="titlefield">'.$langs->trans('Tag').' <span class="star">*</span></td>';
+    print '<td><input type="text" name="upload_tag" size="40" class="flat" placeholder="e.g. CONTRATOS, FACTURAS" required></td>';
+    print '</tr>';
+
+    // Label (optional)
+    print '<tr class="oddeven">';
+    print '<td>'.$langs->trans('Label').' ('.$langs->trans('Optional').')</td>';
+    print '<td><input type="text" name="upload_label" size="40" class="flat"></td>';
+    print '</tr>';
+
+    // File
+    print '<tr class="oddeven">';
+    print '<td>'.$langs->trans('File').' <span class="star">*</span></td>';
+    print '<td><input type="file" name="directfile" class="flat" required></td>';
+    print '</tr>';
+
+    print '</table>';
+    print '</div>';
+
+    print '<div class="center">';
+    print '<input type="submit" class="button button-primary" value="'.$langs->trans('Upload').'">';
+    print '</div>';
+
+    print '</form>';
+    print '</div>';
+}
+
 // List of archives - File Explorer Style with collapsible folders
 print '<br>';
 print load_fiche_titre($langs->trans('ArchivesList'), '', '');
@@ -423,11 +524,18 @@ if (is_array($archives) && count($archives) > 0) {
         print '</tr>';
 
         foreach ($tag_archives as $arch) {
-            $label_display = !empty($arch->template_label) ? $arch->template_label : '-';
+            $is_direct_upload = empty($arch->fk_template);
+            $label_display = !empty($arch->template_label) ? $arch->template_label : ($is_direct_upload ? $langs->trans('DirectUpload') : '-');
             print '<tr class="oddeven archive-row" data-label="'.dol_escape_htmltag(strtolower($label_display)).'" data-filename="'.dol_escape_htmltag(strtolower($arch->filename)).'" data-date="'.$arch->date_generation.'">';
 
-            // Label (template label)
-            print '<td><strong>'.dol_escape_htmltag($label_display).'</strong></td>';
+            // Label (template label or Direct Upload badge)
+            print '<td>';
+            if ($is_direct_upload) {
+                print '<span class="badge badge-info">'.$langs->trans('DirectUpload').'</span>';
+            } else {
+                print '<strong>'.dol_escape_htmltag($label_display).'</strong>';
+            }
+            print '</td>';
 
             // Filename (with download link)
             print '<td>';

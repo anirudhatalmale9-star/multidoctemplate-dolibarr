@@ -42,6 +42,10 @@ TagFilter=Tag Filter
 CategoryFilter=Category Filter
 NoFilter=No filter
 RGPD=RGPD
+UploadFileDirectly=Upload File Directly
+DirectUpload=Direct Upload
+FileUploadedSuccessfully=File uploaded successfully
+Optional=Optional
 
 # Actions
 Generate=Generate
