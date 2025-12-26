@@ -208,15 +208,10 @@ class modMultiDocTemplate extends DolibarrModules
         $sql_check = "SELECT rowid FROM ".MAIN_DB_PREFIX."c_type_categ WHERE code = 'template'";
         $resql = $this->db->query($sql_check);
         if ($resql && $this->db->num_rows($resql) == 0) {
-            // Get next available rowid
-            $sql_max = "SELECT MAX(rowid) as maxid FROM ".MAIN_DB_PREFIX."c_type_categ";
-            $resmax = $this->db->query($sql_max);
-            $objmax = $this->db->fetch_object($resmax);
-            $newid = ($objmax->maxid ? $objmax->maxid + 1 : 100);
-
-            $sql_insert = "INSERT INTO ".MAIN_DB_PREFIX."c_type_categ (rowid, entity, code, type, label, position, active)";
-            $sql_insert .= " VALUES (".$newid.", ".(int)$conf->entity.", 'template', 'multidoctemplate', 'Templates', 100, 1)";
+            $sql_insert = "INSERT INTO ".MAIN_DB_PREFIX."c_type_categ (entity, code, type, label, position, active)";
+            $sql_insert .= " VALUES (".(int)$conf->entity.", 'template', 'multidoctemplate', 'Templates', 100, 1)";
             $this->db->query($sql_insert);
+            dol_syslog("MultiDocTemplate: Registered 'template' category type", LOG_INFO);
         }
 
         $sql = array();

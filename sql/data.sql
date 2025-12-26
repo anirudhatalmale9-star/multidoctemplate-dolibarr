@@ -6,7 +6,8 @@
 
 -- Register 'template' as a new category type in Dolibarr
 -- Type code 'template' must be unique and will appear in Tags/Categories
-INSERT INTO llx_c_type_categ (rowid, entity, code, type, label, position, active)
-SELECT 100, __ENTITY__, 'template', 'multidoctemplate', 'Templates', 100, 1
+-- Note: This is also handled in modMultiDocTemplate.class.php init() function
+INSERT INTO llx_c_type_categ (entity, code, type, label, position, active)
+SELECT 1, 'template', 'multidoctemplate', 'Templates', 100, 1
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM llx_c_type_categ WHERE code = 'template');
