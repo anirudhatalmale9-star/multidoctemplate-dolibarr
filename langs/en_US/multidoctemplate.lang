@@ -60,6 +60,9 @@ Disabled=Disabled
 ErrorTemplateFileNotFound=Template file not found
 ErrorCanNotCreateDir=Cannot create directory
 ErrorFileUploadFailed=File upload failed
+ErrorPdfConversionFailed=PDF conversion failed
+ErrorPdfLibraryNotFound=PDF library not found
 
 # Other
 FileNotFound=File not found
+ConvertToPdf=Convert to PDF

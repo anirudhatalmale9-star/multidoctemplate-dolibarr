@@ -124,6 +124,7 @@ if ($object_type == 'thirdparty') {
 // Generate archive from template
 if ($action == 'generate' && $template_id > 0 && $user->hasRight('multidoctemplate', 'archive_creer')) {
     $template->fetch($template_id);
+    $convert_to_pdf = GETPOST('convert_to_pdf', 'int');
 
     if ($template->id > 0) {
         // Determine tag filter from object's categories
@@ -132,11 +133,15 @@ if ($action == 'generate' && $template_id > 0 && $user->hasRight('multidoctempla
             $tag_filter = $object_categories[$category_id];
         }
 
-        // Generate document
-        $result = $generator->generate($template, $object, $object_type, $user, $tag_filter);
+        // Generate document (with optional PDF conversion for ODT files)
+        $result = $generator->generate($template, $object, $object_type, $user, $tag_filter, $convert_to_pdf);
 
         if ($result > 0) {
-            setEventMessages($langs->trans('ArchiveGeneratedSuccess'), null, 'mesgs');
+            $msg = $langs->trans('ArchiveGeneratedSuccess');
+            if ($convert_to_pdf && strtolower($template->filetype) == 'odt') {
+                $msg .= ' (PDF)';
+            }
+            setEventMessages($msg, null, 'mesgs');
         } else {
             setEventMessages($generator->error, $generator->errors, 'errors');
         }
@@ -317,7 +322,7 @@ if ($user->hasRight('multidoctemplate', 'archive_creer')) {
             print '<div id="'.$tag_id.'_content" class="folder-content" style="margin-left: 25px; display: block;">';
             foreach ($tag_templates as $tpl) {
                 print '<div class="template-item" data-label="'.dol_escape_htmltag(strtolower($tpl->label)).'" style="padding: 5px; border-bottom: 1px solid #eee;">';
-                print '<a href="javascript:void(0)" onclick="selectTemplate('.$tpl->id.', \''.dol_escape_js($tpl->label).'\')" style="text-decoration: none;">';
+                print '<a href="javascript:void(0)" onclick="selectTemplate('.$tpl->id.', \''.dol_escape_js($tpl->label).'\', \''.strtolower($tpl->filetype).'\')" style="text-decoration: none;">';
                 print img_picto('', 'file', 'style="vertical-align: middle;"').' ';
                 print '<span class="template-label">'.dol_escape_htmltag($tpl->label).'</span>';
                 print ' <span class="opacitymedium">('.strtoupper($tpl->filetype).')</span>';
@@ -339,6 +344,8 @@ if ($user->hasRight('multidoctemplate', 'archive_creer')) {
         print '<strong>'.$langs->trans('Selected').':</strong> <span id="selected_template_name" class="opacitymedium">'.$langs->trans('None').'</span>';
         print ' &nbsp; ';
         print '<input type="submit" class="button button-primary" value="'.$langs->trans('Generate').'" id="generate_btn" disabled>';
+        // PDF conversion checkbox (for ODT files)
+        print ' &nbsp; <label id="convert_pdf_label" style="display:none;"><input type="checkbox" name="convert_to_pdf" id="convert_to_pdf" value="1"> '.$langs->trans('ConvertToPdf').'</label>';
         print '</div>';
 
         print '</form>';
@@ -376,11 +383,21 @@ function collapseAllFolders() {
     icons.forEach(function(el) { el.innerHTML = folderClosedIcon; });
 }
 
-function selectTemplate(id, label) {
+function selectTemplate(id, label, filetype) {
     document.getElementById("selected_template_id").value = id;
     document.getElementById("selected_template_name").innerHTML = label;
     document.getElementById("selected_template_name").className = "";
     document.getElementById("generate_btn").disabled = false;
+    // Show/hide PDF conversion checkbox (only for ODT files)
+    var pdfLabel = document.getElementById("convert_pdf_label");
+    if (pdfLabel) {
+        if (filetype === "odt") {
+            pdfLabel.style.display = "inline";
+        } else {
+            pdfLabel.style.display = "none";
+            document.getElementById("convert_to_pdf").checked = false;
+        }
+    }
     // Highlight selected
     var items = document.querySelectorAll(".template-item");
     items.forEach(function(el) { el.style.background = ""; });

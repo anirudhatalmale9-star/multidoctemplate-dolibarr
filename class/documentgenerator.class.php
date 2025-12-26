@@ -38,9 +38,10 @@ class MultiDocGenerator
      * @param string $object_type Object type (thirdparty or contact)
      * @param User $user User generating the document
      * @param string $tag_filter Tag/category filter for folder organization
+     * @param int $convert_to_pdf 1=Convert ODT to PDF after generation
      * @return int >0 if OK, <0 if KO
      */
-    public function generate($template, $object, $object_type, $user, $tag_filter = '')
+    public function generate($template, $object, $object_type, $user, $tag_filter = '', $convert_to_pdf = 0)
     {
         global $conf, $langs, $mysoc;
 
@@ -94,6 +95,25 @@ class MultiDocGenerator
             return $result;
         }
 
+        // Convert to PDF if requested (for ODT files)
+        $final_filepath = $output_filepath;
+        $final_filename = $output_filename;
+        $final_ext = $ext;
+
+        if ($convert_to_pdf && strtolower($ext) == 'odt') {
+            $pdf_result = $this->convertOdtToPdf($output_filepath);
+            if ($pdf_result['success']) {
+                $final_filepath = $pdf_result['pdf_path'];
+                $final_filename = pathinfo($output_filename, PATHINFO_FILENAME).'.pdf';
+                $final_ext = 'pdf';
+                // Delete the original ODT file
+                dol_delete_file($output_filepath);
+            } else {
+                // PDF conversion failed, keep the ODT
+                $this->errors[] = $pdf_result['error'];
+            }
+        }
+
         // Create archive record
         require_once __DIR__.'/archive.class.php';
         $archive = new MultiDocArchive($this->db);
@@ -101,17 +121,17 @@ class MultiDocGenerator
         $archive->fk_template = $template->id;
         $archive->object_type = $object_type;
         $archive->object_id = $object->id;
-        $archive->filename = $output_filename;
-        $archive->filepath = $output_filepath;
-        $archive->filetype = strtolower($ext);
-        $archive->filesize = filesize($output_filepath);
+        $archive->filename = $final_filename;
+        $archive->filepath = $final_filepath;
+        $archive->filetype = strtolower($final_ext);
+        $archive->filesize = filesize($final_filepath);
         $archive->tag_filter = $folder_tag;
 
         $result = $archive->create($user);
 
         if ($result < 0) {
             // Delete generated file if DB insert failed
-            dol_delete_file($output_filepath);
+            dol_delete_file($final_filepath);
             $this->error = $archive->error;
             return -3;
         }
@@ -732,5 +752,268 @@ class MultiDocGenerator
         }
 
         return $subs;
+    }
+
+    /**
+     * Convert ODT file to PDF via HTML
+     * Uses LibreOffice or unoconv if available, or PHP-based conversion
+     *
+     * @param string $odt_path Path to ODT file
+     * @return array ['success' => bool, 'pdf_path' => string, 'error' => string]
+     */
+    protected function convertOdtToPdf($odt_path)
+    {
+        global $conf, $langs;
+
+        $result = array('success' => false, 'pdf_path' => '', 'error' => '');
+        $pdf_path = preg_replace('/\.odt$/i', '.pdf', $odt_path);
+
+        // Method 1: Try LibreOffice command line
+        $libreoffice_paths = array(
+            '/usr/bin/libreoffice',
+            '/usr/bin/soffice',
+            '/usr/local/bin/libreoffice',
+            '/usr/local/bin/soffice',
+            'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+            'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe'
+        );
+
+        $libreoffice_bin = '';
+        foreach ($libreoffice_paths as $path) {
+            if (file_exists($path) || (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' && file_exists($path))) {
+                $libreoffice_bin = $path;
+                break;
+            }
+        }
+
+        // Also check if it's in PATH
+        if (empty($libreoffice_bin)) {
+            $which = shell_exec('which libreoffice 2>/dev/null') ?: shell_exec('which soffice 2>/dev/null');
+            if (!empty($which)) {
+                $libreoffice_bin = trim($which);
+            }
+        }
+
+        if (!empty($libreoffice_bin)) {
+            $output_dir = dirname($odt_path);
+            $cmd = escapeshellarg($libreoffice_bin).' --headless --convert-to pdf --outdir '.escapeshellarg($output_dir).' '.escapeshellarg($odt_path).' 2>&1';
+
+            $output = array();
+            $return_var = 0;
+            exec($cmd, $output, $return_var);
+
+            if ($return_var === 0 && file_exists($pdf_path)) {
+                $result['success'] = true;
+                $result['pdf_path'] = $pdf_path;
+                return $result;
+            }
+        }
+
+        // Method 2: Try unoconv
+        $unoconv_bin = shell_exec('which unoconv 2>/dev/null');
+        if (!empty($unoconv_bin)) {
+            $cmd = 'unoconv -f pdf '.escapeshellarg($odt_path).' 2>&1';
+            $output = array();
+            $return_var = 0;
+            exec($cmd, $output, $return_var);
+
+            if ($return_var === 0 && file_exists($pdf_path)) {
+                $result['success'] = true;
+                $result['pdf_path'] = $pdf_path;
+                return $result;
+            }
+        }
+
+        // Method 3: PHP-based conversion using ODT -> HTML -> PDF
+        $html_result = $this->convertOdtToHtml($odt_path);
+        if ($html_result['success']) {
+            $pdf_result = $this->convertHtmlToPdf($html_result['html'], $pdf_path);
+            if ($pdf_result['success']) {
+                $result['success'] = true;
+                $result['pdf_path'] = $pdf_path;
+                return $result;
+            } else {
+                $result['error'] = $pdf_result['error'];
+            }
+        } else {
+            $result['error'] = $html_result['error'];
+        }
+
+        // If all methods fail
+        if (empty($result['error'])) {
+            $result['error'] = $langs->trans('ErrorPdfConversionFailed');
+        }
+
+        return $result;
+    }
+
+    /**
+     * Convert ODT content to HTML
+     *
+     * @param string $odt_path Path to ODT file
+     * @return array ['success' => bool, 'html' => string, 'error' => string]
+     */
+    protected function convertOdtToHtml($odt_path)
+    {
+        global $langs;
+
+        $result = array('success' => false, 'html' => '', 'error' => '');
+
+        if (!class_exists('ZipArchive')) {
+            $result['error'] = 'ZipArchive class not available';
+            return $result;
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($odt_path) !== true) {
+            $result['error'] = $langs->trans('ErrorCanNotOpenFile', $odt_path);
+            return $result;
+        }
+
+        // Read content.xml
+        $content = $zip->getFromName('content.xml');
+        $styles = $zip->getFromName('styles.xml');
+        $zip->close();
+
+        if ($content === false) {
+            $result['error'] = 'Cannot read content.xml from ODT';
+            return $result;
+        }
+
+        // Parse ODT XML to HTML
+        $html = $this->parseOdtToHtml($content, $styles);
+
+        $result['success'] = true;
+        $result['html'] = $html;
+        return $result;
+    }
+
+    /**
+     * Parse ODT XML content to HTML
+     *
+     * @param string $content ODT content.xml content
+     * @param string $styles ODT styles.xml content (optional)
+     * @return string HTML content
+     */
+    protected function parseOdtToHtml($content, $styles = '')
+    {
+        // Remove XML declaration
+        $content = preg_replace('/<\?xml[^>]+\?>/', '', $content);
+
+        // Extract text content and basic formatting
+        $html = '<!DOCTYPE html><html><head><meta charset="UTF-8">';
+        $html .= '<style>';
+        $html .= 'body { font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin: 20mm; }';
+        $html .= 'p { margin: 0 0 10px 0; }';
+        $html .= 'table { border-collapse: collapse; width: 100%; margin: 10px 0; }';
+        $html .= 'td, th { border: 1px solid #ccc; padding: 5px; }';
+        $html .= 'h1, h2, h3, h4, h5, h6 { margin: 15px 0 10px 0; }';
+        $html .= '.bold { font-weight: bold; }';
+        $html .= '.italic { font-style: italic; }';
+        $html .= '.underline { text-decoration: underline; }';
+        $html .= '</style>';
+        $html .= '</head><body>';
+
+        // Convert ODT elements to HTML
+        // Paragraphs
+        $content = preg_replace('/<text:p[^>]*>/', '<p>', $content);
+        $content = preg_replace('/<\/text:p>/', '</p>', $content);
+
+        // Line breaks
+        $content = preg_replace('/<text:line-break\s*\/>/', '<br>', $content);
+
+        // Spans with bold
+        $content = preg_replace('/<text:span[^>]*text:style-name="[^"]*Bold[^"]*"[^>]*>/', '<span class="bold">', $content);
+        $content = preg_replace('/<text:span[^>]*text:style-name="[^"]*Italic[^"]*"[^>]*>/', '<span class="italic">', $content);
+        $content = preg_replace('/<text:span[^>]*>/', '<span>', $content);
+        $content = preg_replace('/<\/text:span>/', '</span>', $content);
+
+        // Tables
+        $content = preg_replace('/<table:table[^>]*>/', '<table>', $content);
+        $content = preg_replace('/<\/table:table>/', '</table>', $content);
+        $content = preg_replace('/<table:table-row[^>]*>/', '<tr>', $content);
+        $content = preg_replace('/<\/table:table-row>/', '</tr>', $content);
+        $content = preg_replace('/<table:table-cell[^>]*>/', '<td>', $content);
+        $content = preg_replace('/<\/table:table-cell>/', '</td>', $content);
+
+        // Headings
+        $content = preg_replace('/<text:h[^>]*text:outline-level="1"[^>]*>/', '<h1>', $content);
+        $content = preg_replace('/<text:h[^>]*text:outline-level="2"[^>]*>/', '<h2>', $content);
+        $content = preg_replace('/<text:h[^>]*text:outline-level="3"[^>]*>/', '<h3>', $content);
+        $content = preg_replace('/<text:h[^>]*>/', '<h4>', $content);
+        $content = preg_replace('/<\/text:h>/', '</h4>', $content);
+
+        // Remove remaining ODT tags but keep content
+        $content = preg_replace('/<office:[^>]+>/', '', $content);
+        $content = preg_replace('/<\/office:[^>]+>/', '', $content);
+        $content = preg_replace('/<text:[^>]+\/>/', '', $content);
+        $content = preg_replace('/<style:[^>]+>.*?<\/style:[^>]+>/s', '', $content);
+        $content = preg_replace('/<draw:[^>]+>.*?<\/draw:[^>]+>/s', '', $content);
+        $content = preg_replace('/<table:table-column[^>]*\/>/', '', $content);
+
+        // Clean up any remaining namespaced tags
+        $content = preg_replace('/<[a-z]+:[^>]+>/', '', $content);
+        $content = preg_replace('/<\/[a-z]+:[^>]+>/', '', $content);
+
+        $html .= $content;
+        $html .= '</body></html>';
+
+        return $html;
+    }
+
+    /**
+     * Convert HTML to PDF using TCPDF or Dolibarr's PDF library
+     *
+     * @param string $html HTML content
+     * @param string $pdf_path Output PDF path
+     * @return array ['success' => bool, 'error' => string]
+     */
+    protected function convertHtmlToPdf($html, $pdf_path)
+    {
+        global $conf, $langs;
+
+        $result = array('success' => false, 'error' => '');
+
+        // Try TCPDF (included with Dolibarr)
+        $tcpdf_path = DOL_DOCUMENT_ROOT.'/includes/tecnickcom/tcpdf/tcpdf.php';
+        if (file_exists($tcpdf_path)) {
+            require_once $tcpdf_path;
+
+            try {
+                $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
+                $pdf->SetCreator('MultiDocTemplate');
+                $pdf->SetAuthor('Dolibarr');
+                $pdf->SetTitle('Generated Document');
+
+                // Remove default header/footer
+                $pdf->setPrintHeader(false);
+                $pdf->setPrintFooter(false);
+
+                // Set margins
+                $pdf->SetMargins(15, 15, 15);
+                $pdf->SetAutoPageBreak(true, 15);
+
+                // Add a page
+                $pdf->AddPage();
+
+                // Write HTML content
+                $pdf->writeHTML($html, true, false, true, false, '');
+
+                // Output PDF to file
+                $pdf->Output($pdf_path, 'F');
+
+                if (file_exists($pdf_path)) {
+                    $result['success'] = true;
+                    return $result;
+                }
+            } catch (Exception $e) {
+                $result['error'] = $e->getMessage();
+                return $result;
+            }
+        }
+
+        // Fallback error
+        $result['error'] = $langs->trans('ErrorPdfLibraryNotFound');
+        return $result;
     }
 }

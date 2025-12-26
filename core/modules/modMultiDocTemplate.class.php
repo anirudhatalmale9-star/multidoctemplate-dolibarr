@@ -50,7 +50,7 @@ class modMultiDocTemplate extends DolibarrModules
             '<em>Note: Replace XXX with your extra field code for custom fields.</em>';
 
         // Version
-        $this->version = '1.2.0';
+        $this->version = '1.3.0';
 
         // Module constants
         $this->const_name = 'MAIN_MODULE_MULTIDOCTEMPLATE';
