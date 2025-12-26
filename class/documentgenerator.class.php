@@ -768,63 +768,7 @@ class MultiDocGenerator
         $result = array('success' => false, 'pdf_path' => '', 'error' => '');
         $pdf_path = preg_replace('/\.odt$/i', '.pdf', $odt_path);
 
-        // Method 1: Try LibreOffice command line
-        $libreoffice_paths = array(
-            '/usr/bin/libreoffice',
-            '/usr/bin/soffice',
-            '/usr/local/bin/libreoffice',
-            '/usr/local/bin/soffice',
-            'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
-            'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe'
-        );
-
-        $libreoffice_bin = '';
-        foreach ($libreoffice_paths as $path) {
-            if (file_exists($path) || (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' && file_exists($path))) {
-                $libreoffice_bin = $path;
-                break;
-            }
-        }
-
-        // Also check if it's in PATH
-        if (empty($libreoffice_bin)) {
-            $which = shell_exec('which libreoffice 2>/dev/null') ?: shell_exec('which soffice 2>/dev/null');
-            if (!empty($which)) {
-                $libreoffice_bin = trim($which);
-            }
-        }
-
-        if (!empty($libreoffice_bin)) {
-            $output_dir = dirname($odt_path);
-            $cmd = escapeshellarg($libreoffice_bin).' --headless --convert-to pdf --outdir '.escapeshellarg($output_dir).' '.escapeshellarg($odt_path).' 2>&1';
-
-            $output = array();
-            $return_var = 0;
-            exec($cmd, $output, $return_var);
-
-            if ($return_var === 0 && file_exists($pdf_path)) {
-                $result['success'] = true;
-                $result['pdf_path'] = $pdf_path;
-                return $result;
-            }
-        }
-
-        // Method 2: Try unoconv
-        $unoconv_bin = shell_exec('which unoconv 2>/dev/null');
-        if (!empty($unoconv_bin)) {
-            $cmd = 'unoconv -f pdf '.escapeshellarg($odt_path).' 2>&1';
-            $output = array();
-            $return_var = 0;
-            exec($cmd, $output, $return_var);
-
-            if ($return_var === 0 && file_exists($pdf_path)) {
-                $result['success'] = true;
-                $result['pdf_path'] = $pdf_path;
-                return $result;
-            }
-        }
-
-        // Method 3: PHP-based conversion using ODT -> HTML -> PDF
+        // PHP-based conversion using ODT -> HTML -> PDF (using TCPDF)
         $html_result = $this->convertOdtToHtml($odt_path);
         if ($html_result['success']) {
             $pdf_result = $this->convertHtmlToPdf($html_result['html'], $pdf_path);
@@ -839,7 +783,7 @@ class MultiDocGenerator
             $result['error'] = $html_result['error'];
         }
 
-        // If all methods fail
+        // If conversion fails
         if (empty($result['error'])) {
             $result['error'] = $langs->trans('ErrorPdfConversionFailed');
         }
