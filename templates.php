@@ -47,6 +47,7 @@ require_once DOL_DOCUMENT_ROOT.'/user/class/usergroup.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/usergroups.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 require_once __DIR__.'/class/template.class.php';
 
 // Load translations
@@ -66,6 +67,7 @@ if (!$user->hasRight('multidoctemplate', 'template_voir')) {
 // Initialize objects
 $object = new UserGroup($db);
 $template = new MultiDocTemplate($db);
+$form = new Form($db);
 
 if ($id > 0) {
     $result = $object->fetch($id);
