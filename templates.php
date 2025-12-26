@@ -47,8 +47,7 @@ require_once DOL_DOCUMENT_ROOT.'/user/class/usergroup.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/usergroups.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
-require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
-require_once DOL_DOCUMENT_ROOT.'/core/class/html.formcategory.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 require_once __DIR__.'/class/template.class.php';
 
 // Load translations
@@ -68,6 +67,7 @@ if (!$user->hasRight('multidoctemplate', 'template_voir')) {
 // Initialize objects
 $object = new UserGroup($db);
 $template = new MultiDocTemplate($db);
+$form = new Form($db);
 
 if ($id > 0) {
     $result = $object->fetch($id);
@@ -208,22 +208,10 @@ if ($user->hasRight('multidoctemplate', 'template_creer')) {
     print '<th colspan="2">'.$langs->trans('UploadNewTemplate').'</th>';
     print '</tr>';
 
-    // Tag/Category - uses Dolibarr native categories (Users type)
+    // Tag (folder)
     print '<tr class="oddeven">';
-    print '<td class="titlefield">'.$langs->trans('Tag/category').' <span class="star">*</span></td>';
-    print '<td>';
-    // Use Users category type (Categorie::TYPE_USER = 7)
-    $form = new Form($db);
-    print img_picto('', 'category', 'class="pictofixedwidth"');
-    print $form->select_all_categories(Categorie::TYPE_USER, '', 'template_category', 64, 0, 0, 0, 'minwidth300');
-    print ' <a href="'.DOL_URL_ROOT.'/categories/index.php?type='.Categorie::TYPE_USER.'" target="_blank">'.img_picto($langs->trans('Create'), 'add').'</a>';
-    print '</td>';
-    print '</tr>';
-
-    // Legacy Tag field (optional, for backwards compatibility)
-    print '<tr class="oddeven">';
-    print '<td>'.$langs->trans('Tag').' ('.$langs->trans('Optional').')</td>';
-    print '<td><input type="text" name="template_tag" size="40" class="flat" placeholder="'.$langs->trans('LegacyTagField').'"></td>';
+    print '<td class="titlefield">'.$langs->trans('Tag').' <span class="star">*</span></td>';
+    print '<td><input type="text" name="template_tag" size="40" class="flat" placeholder="e.g. CONTRATOS, FACTURAS, DOCUMENTOS" required></td>';
     print '</tr>';
 
     // Label
@@ -267,7 +255,6 @@ $templates = $template->fetchAllByUserGroup($object->id, -1);
 print '<div class="div-table-responsive">';
 print '<table class="noborder centpercent">';
 print '<tr class="liste_titre">';
-print '<th>'.$langs->trans('Category').'</th>';
 print '<th>'.$langs->trans('Tag').'</th>';
 print '<th>'.$langs->trans('Label').'</th>';
 print '<th>'.$langs->trans('Filename').'</th>';
@@ -279,19 +266,7 @@ if (is_array($templates) && count($templates) > 0) {
     foreach ($templates as $tpl) {
         print '<tr class="oddeven">';
 
-        // Category (from Dolibarr native categories)
-        print '<td>';
-        if (!empty($tpl->category_label)) {
-            print img_picto('', 'category', 'class="pictofixedwidth"');
-            print '<a href="'.DOL_URL_ROOT.'/categories/viewcat.php?id='.$tpl->fk_category.'&type='.Categorie::TYPE_USER.'" target="_blank">';
-            print dol_escape_htmltag($tpl->category_label);
-            print '</a>';
-        } else {
-            print '<span class="opacitymedium">-</span>';
-        }
-        print '</td>';
-
-        // Legacy Tag
+        // Tag
         print '<td><span class="badge badge-secondary">'.dol_escape_htmltag($tpl->tag ?: '-').'</span></td>';
 
         // Label
@@ -323,7 +298,7 @@ if (is_array($templates) && count($templates) > 0) {
         print '</tr>';
     }
 } else {
-    print '<tr class="oddeven"><td colspan="6" class="opacitymedium">'.$langs->trans('NoTemplatesYet').'</td></tr>';
+    print '<tr class="oddeven"><td colspan="5" class="opacitymedium">'.$langs->trans('NoTemplatesYet').'</td></tr>';
 }
 
 print '</table>';

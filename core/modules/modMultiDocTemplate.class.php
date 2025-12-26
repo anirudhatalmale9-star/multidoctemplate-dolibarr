@@ -50,7 +50,7 @@ class modMultiDocTemplate extends DolibarrModules
             '<em>Note: Replace XXX with your extra field code for custom fields.</em>';
 
         // Version
-        $this->version = '2.2.0';
+        $this->version = '2.3.0';
 
         // Module constants
         $this->const_name = 'MAIN_MODULE_MULTIDOCTEMPLATE';
@@ -76,8 +76,7 @@ class modMultiDocTemplate extends DolibarrModules
         // Required modules
         $this->depends = array(
             'modSociete',
-            'modUser',
-            'modCategorie'  // Required for Tags/Categories support
+            'modUser'
         );
         $this->requiredby = array();
         $this->conflictwith = array();
@@ -202,9 +201,6 @@ class modMultiDocTemplate extends DolibarrModules
         if ($result < 0) {
             return -1;
         }
-
-        // Note: We use existing Dolibarr category type "Users" (Categorie::TYPE_USER)
-        // No need to create custom category type since llx_c_type_categ doesn't exist in Dolibarr 23 alpha
 
         $sql = array();
 
