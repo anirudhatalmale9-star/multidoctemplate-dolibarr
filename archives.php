@@ -237,6 +237,37 @@ if ($action == 'confirm_delete' && $confirm == 'yes' && $user->hasRight('multido
 $title = $langs->trans('Archives').' - '.$object->name;
 llxHeader('', $title);
 
+// Custom tooltip styles
+print '<style>
+.mdt-tooltip-container {
+    position: relative;
+    display: inline-block;
+}
+.mdt-tooltip {
+    position: fixed;
+    background-color: #333;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    max-width: 300px;
+    z-index: 99999;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    pointer-events: none;
+    white-space: normal;
+    word-wrap: break-word;
+}
+.mdt-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 20px;
+    border-width: 6px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+}
+</style>';
+
 // Prepare tabs
 if ($object_type == 'thirdparty') {
     $head = societe_prepare_head($object);
@@ -327,9 +358,9 @@ if ($user->hasRight('multidoctemplate', 'archive_creer')) {
                 print '<span class="template-label">'.dol_escape_htmltag($tpl->label).'</span>';
                 print ' <span class="opacitymedium">('.strtoupper($tpl->filetype).')</span>';
                 print '</a>';
-                // Info icon with description tooltip
+                // Info icon with description tooltip (custom tooltip to avoid clipping)
                 if (!empty($tpl->description)) {
-                    print ' '.img_picto(dol_escape_htmltag($tpl->description), 'info', 'style="vertical-align: middle; cursor: help;"');
+                    print ' <span class="mdt-tooltip-trigger" data-tooltip="'.dol_escape_htmltag($tpl->description).'">'.img_picto('', 'info', 'style="vertical-align: middle; cursor: help;"').'</span>';
                 }
                 print '</div>';
             }
@@ -438,6 +469,57 @@ function filterTemplates() {
         }
     });
 }
+
+// Custom tooltip functionality
+(function() {
+    var tooltip = null;
+
+    function showTooltip(e) {
+        var trigger = e.target.closest(".mdt-tooltip-trigger");
+        if (!trigger) return;
+
+        var text = trigger.getAttribute("data-tooltip");
+        if (!text) return;
+
+        // Create tooltip element
+        tooltip = document.createElement("div");
+        tooltip.className = "mdt-tooltip";
+        tooltip.textContent = text;
+        document.body.appendChild(tooltip);
+
+        // Position tooltip above the trigger
+        var rect = trigger.getBoundingClientRect();
+        var tooltipRect = tooltip.getBoundingClientRect();
+        var left = rect.left;
+        var top = rect.top - tooltipRect.height - 10;
+
+        // Adjust if tooltip goes off-screen
+        if (left + tooltipRect.width > window.innerWidth) {
+            left = window.innerWidth - tooltipRect.width - 10;
+        }
+        if (top < 0) {
+            top = rect.bottom + 10;
+            tooltip.style.setProperty("--arrow-position", "top");
+        }
+
+        tooltip.style.left = left + "px";
+        tooltip.style.top = top + "px";
+    }
+
+    function hideTooltip() {
+        if (tooltip && tooltip.parentNode) {
+            tooltip.parentNode.removeChild(tooltip);
+            tooltip = null;
+        }
+    }
+
+    document.addEventListener("mouseover", showTooltip);
+    document.addEventListener("mouseout", function(e) {
+        if (e.target.closest(".mdt-tooltip-trigger")) {
+            hideTooltip();
+        }
+    });
+})();
 </script>';
 
     } else {
