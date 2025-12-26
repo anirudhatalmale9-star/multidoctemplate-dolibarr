@@ -325,8 +325,8 @@ if ($user->hasRight('multidoctemplate', 'archive_creer')) {
         // Search box
         print '<div class="marginbottomonly">';
         print '<input type="text" id="template_search" class="flat minwidth200" placeholder="'.$langs->trans('Search').'..." onkeyup="filterTemplates()">';
-        print ' <a href="javascript:void(0)" onclick="expandAllFolders()" title="'.$langs->trans('ExpandAll').'">'.img_picto($langs->trans('ExpandAll'), 'folder-open').'</a>';
-        print ' <a href="javascript:void(0)" onclick="collapseAllFolders()" title="'.$langs->trans('CollapseAll').'">'.img_picto($langs->trans('CollapseAll'), 'folder').'</a>';
+        print ' <a href="javascript:void(0)" onclick="expandAllFolders()" class="mdt-tooltip-trigger" data-tooltip="'.$langs->trans('ExpandAll').'">'.img_picto('', 'folder-open').'</a>';
+        print ' <a href="javascript:void(0)" onclick="collapseAllFolders()" class="mdt-tooltip-trigger" data-tooltip="'.$langs->trans('CollapseAll').'">'.img_picto('', 'folder').'</a>';
         print '</div>';
 
         print '<form action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&object_type='.$object_type.'" method="POST" id="generate_form">';
@@ -591,8 +591,8 @@ if (is_array($archives) && count($archives) > 0) {
     // Search and controls
     print '<div class="marginbottomonly">';
     print '<input type="text" id="archive_search" class="flat minwidth200" placeholder="'.$langs->trans('Search').'..." onkeyup="filterArchives()">';
-    print ' <a href="javascript:void(0)" onclick="expandAllArchiveFolders()" title="'.$langs->trans('ExpandAll').'">'.img_picto($langs->trans('ExpandAll'), 'folder-open').'</a>';
-    print ' <a href="javascript:void(0)" onclick="collapseAllArchiveFolders()" title="'.$langs->trans('CollapseAll').'">'.img_picto($langs->trans('CollapseAll'), 'folder').'</a>';
+    print ' <a href="javascript:void(0)" onclick="expandAllArchiveFolders()" class="mdt-tooltip-trigger" data-tooltip="'.$langs->trans('ExpandAll').'">'.img_picto('', 'folder-open').'</a>';
+    print ' <a href="javascript:void(0)" onclick="collapseAllArchiveFolders()" class="mdt-tooltip-trigger" data-tooltip="'.$langs->trans('CollapseAll').'">'.img_picto('', 'folder').'</a>';
     print '</div>';
 
     // File explorer style container
