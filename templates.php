@@ -47,7 +47,6 @@ require_once DOL_DOCUMENT_ROOT.'/user/class/usergroup.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/usergroups.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
-require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 require_once __DIR__.'/class/template.class.php';
 
 // Load translations
@@ -67,7 +66,6 @@ if (!$user->hasRight('multidoctemplate', 'template_voir')) {
 // Initialize objects
 $object = new UserGroup($db);
 $template = new MultiDocTemplate($db);
-$form = new Form($db);
 
 if ($id > 0) {
     $result = $object->fetch($id);
@@ -113,7 +111,6 @@ if ($action == 'upload' && $user->hasRight('multidoctemplate', 'template_creer')
                 $template->label = GETPOST('template_label', 'alphanohtml') ?: pathinfo($filename, PATHINFO_FILENAME);
                 $template->description = GETPOST('template_description', 'restricthtml');
                 $template->tag = GETPOST('template_tag', 'alphanohtml');
-                $template->fk_category = GETPOST('template_category', 'int');  // Native Dolibarr category
                 $template->fk_usergroup = $object->id;
                 $template->filename = $sanitized_filename;
                 $template->filepath = $filepath;
@@ -211,7 +208,7 @@ if ($user->hasRight('multidoctemplate', 'template_creer')) {
     // Tag (folder)
     print '<tr class="oddeven">';
     print '<td class="titlefield">'.$langs->trans('Tag').' <span class="star">*</span></td>';
-    print '<td><input type="text" name="template_tag" size="40" class="flat" placeholder="e.g. CONTRATOS, FACTURAS, DOCUMENTOS" required></td>';
+    print '<td><input type="text" name="template_tag" size="40" class="flat" placeholder="e.g. course, exam, credential" required></td>';
     print '</tr>';
 
     // Label

@@ -50,7 +50,7 @@ class modMultiDocTemplate extends DolibarrModules
             '<em>Note: Replace XXX with your extra field code for custom fields.</em>';
 
         // Version
-        $this->version = '2.3.0';
+        $this->version = '1.0.0';
 
         // Module constants
         $this->const_name = 'MAIN_MODULE_MULTIDOCTEMPLATE';
@@ -195,8 +195,6 @@ class modMultiDocTemplate extends DolibarrModules
      */
     public function init($options = '')
     {
-        global $conf;
-
         $result = $this->_load_tables('/multidoctemplate/sql/');
         if ($result < 0) {
             return -1;
