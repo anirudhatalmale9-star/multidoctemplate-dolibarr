@@ -50,7 +50,7 @@ class modMultiDocTemplate extends DolibarrModules
             '<em>Note: Replace XXX with your extra field code for custom fields.</em>';
 
         // Version
-        $this->version = '2.1.0';
+        $this->version = '2.2.0';
 
         // Module constants
         $this->const_name = 'MAIN_MODULE_MULTIDOCTEMPLATE';
@@ -203,16 +203,8 @@ class modMultiDocTemplate extends DolibarrModules
             return -1;
         }
 
-        // Register 'template' as a new category type if not exists
-        // This allows using Dolibarr's native Tags/Categories for templates
-        $sql_check = "SELECT rowid FROM ".MAIN_DB_PREFIX."c_type_categ WHERE code = 'template'";
-        $resql = $this->db->query($sql_check);
-        if ($resql && $this->db->num_rows($resql) == 0) {
-            $sql_insert = "INSERT INTO ".MAIN_DB_PREFIX."c_type_categ (entity, code, type, label, position, active)";
-            $sql_insert .= " VALUES (".(int)$conf->entity.", 'template', 'multidoctemplate', 'Templates', 100, 1)";
-            $this->db->query($sql_insert);
-            dol_syslog("MultiDocTemplate: Registered 'template' category type", LOG_INFO);
-        }
+        // Note: We use existing Dolibarr category type "Users" (Categorie::TYPE_USER)
+        // No need to create custom category type since llx_c_type_categ doesn't exist in Dolibarr 23 alpha
 
         $sql = array();
 
