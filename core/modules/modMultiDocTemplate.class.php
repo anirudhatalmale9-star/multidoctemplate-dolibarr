@@ -50,7 +50,7 @@ class modMultiDocTemplate extends DolibarrModules
             '<em>Note: Replace XXX with your extra field code for custom fields.</em>';
 
         // Version
-        $this->version = '1.0.0';
+        $this->version = '2.1.0';
 
         // Module constants
         $this->const_name = 'MAIN_MODULE_MULTIDOCTEMPLATE';
@@ -76,7 +76,8 @@ class modMultiDocTemplate extends DolibarrModules
         // Required modules
         $this->depends = array(
             'modSociete',
-            'modUser'
+            'modUser',
+            'modCategorie'  // Required for Tags/Categories support
         );
         $this->requiredby = array();
         $this->conflictwith = array();
@@ -195,9 +196,27 @@ class modMultiDocTemplate extends DolibarrModules
      */
     public function init($options = '')
     {
+        global $conf;
+
         $result = $this->_load_tables('/multidoctemplate/sql/');
         if ($result < 0) {
             return -1;
+        }
+
+        // Register 'template' as a new category type if not exists
+        // This allows using Dolibarr's native Tags/Categories for templates
+        $sql_check = "SELECT rowid FROM ".MAIN_DB_PREFIX."c_type_categ WHERE code = 'template'";
+        $resql = $this->db->query($sql_check);
+        if ($resql && $this->db->num_rows($resql) == 0) {
+            // Get next available rowid
+            $sql_max = "SELECT MAX(rowid) as maxid FROM ".MAIN_DB_PREFIX."c_type_categ";
+            $resmax = $this->db->query($sql_max);
+            $objmax = $this->db->fetch_object($resmax);
+            $newid = ($objmax->maxid ? $objmax->maxid + 1 : 100);
+
+            $sql_insert = "INSERT INTO ".MAIN_DB_PREFIX."c_type_categ (rowid, entity, code, type, label, position, active)";
+            $sql_insert .= " VALUES (".$newid.", ".(int)$conf->entity.", 'template', 'multidoctemplate', 'Templates', 100, 1)";
+            $this->db->query($sql_insert);
         }
 
         $sql = array();
