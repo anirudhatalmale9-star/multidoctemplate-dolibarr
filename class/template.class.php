@@ -24,6 +24,7 @@ class MultiDocTemplate extends CommonObject
     public $label;
     public $description;
     public $tag;
+    public $fk_category;  // Category filter - template only shows for objects with this category
     public $fk_usergroup;
     public $filename;
     public $filepath;
@@ -91,13 +92,14 @@ class MultiDocTemplate extends CommonObject
         $this->db->begin();
 
         $sql = "INSERT INTO ".MAIN_DB_PREFIX.$this->table_element." (";
-        $sql .= "ref, label, description, tag, fk_usergroup, filename, filepath, filetype, filesize, mime_type,";
+        $sql .= "ref, label, description, tag, fk_category, fk_usergroup, filename, filepath, filetype, filesize, mime_type,";
         $sql .= "active, date_creation, fk_user_creat, entity";
         $sql .= ") VALUES (";
         $sql .= "'".$this->db->escape($this->ref)."',";
         $sql .= "'".$this->db->escape($this->label)."',";
         $sql .= "'".$this->db->escape($this->description)."',";
         $sql .= "'".$this->db->escape($this->tag)."',";
+        $sql .= ($this->fk_category > 0 ? (int) $this->fk_category : "NULL").",";
         $sql .= $this->fk_usergroup.",";
         $sql .= "'".$this->db->escape($this->filename)."',";
         $sql .= "'".$this->db->escape($this->filepath)."',";
@@ -149,7 +151,7 @@ class MultiDocTemplate extends CommonObject
     {
         global $conf;
 
-        $sql = "SELECT t.rowid, t.ref, t.label, t.description, t.tag, t.fk_usergroup,";
+        $sql = "SELECT t.rowid, t.ref, t.label, t.description, t.tag, t.fk_category, t.fk_usergroup,";
         $sql .= " t.filename, t.filepath, t.filetype, t.filesize, t.mime_type,";
         $sql .= " t.active, t.date_creation, t.date_modification,";
         $sql .= " t.fk_user_creat, t.fk_user_modif, t.entity";
@@ -173,6 +175,7 @@ class MultiDocTemplate extends CommonObject
                 $this->label = $obj->label;
                 $this->description = $obj->description;
                 $this->tag = $obj->tag;
+                $this->fk_category = $obj->fk_category;
                 $this->fk_usergroup = $obj->fk_usergroup;
                 $this->filename = $obj->filename;
                 $this->filepath = $obj->filepath;
@@ -272,7 +275,7 @@ class MultiDocTemplate extends CommonObject
 
         $templates = array();
 
-        $sql = "SELECT t.rowid, t.ref, t.label, t.description, t.tag, t.fk_usergroup,";
+        $sql = "SELECT t.rowid, t.ref, t.label, t.description, t.tag, t.fk_category, t.fk_usergroup,";
         $sql .= " t.filename, t.filepath, t.filetype, t.filesize, t.mime_type,";
         $sql .= " t.active, t.date_creation";
         $sql .= " FROM ".MAIN_DB_PREFIX.$this->table_element." as t";
@@ -294,6 +297,7 @@ class MultiDocTemplate extends CommonObject
                 $template->label = $obj->label;
                 $template->description = $obj->description;
                 $template->tag = $obj->tag;
+                $template->fk_category = $obj->fk_category;
                 $template->fk_usergroup = $obj->fk_usergroup;
                 $template->filename = $obj->filename;
                 $template->filepath = $obj->filepath;
@@ -359,7 +363,7 @@ class MultiDocTemplate extends CommonObject
             }
         }
 
-        $sql = "SELECT t.rowid, t.ref, t.label, t.description, t.tag, t.fk_usergroup,";
+        $sql = "SELECT t.rowid, t.ref, t.label, t.description, t.tag, t.fk_category, t.fk_usergroup,";
         $sql .= " t.filename, t.filepath, t.filetype, t.filesize, t.mime_type,";
         $sql .= " t.active, t.date_creation, ug.nom as usergroup_name";
         $sql .= " FROM ".MAIN_DB_PREFIX.$this->table_element." as t";
@@ -380,6 +384,7 @@ class MultiDocTemplate extends CommonObject
                 $template->label = $obj->label;
                 $template->description = $obj->description;
                 $template->tag = $obj->tag;
+                $template->fk_category = $obj->fk_category;
                 $template->fk_usergroup = $obj->fk_usergroup;
                 $template->filename = $obj->filename;
                 $template->filepath = $obj->filepath;
@@ -397,6 +402,51 @@ class MultiDocTemplate extends CommonObject
             $this->error = $this->db->lasterror();
             return -1;
         }
+    }
+
+    /**
+     * Get templates for a user, filtered by object's categories
+     * A template is shown if:
+     * - It has no category filter (fk_category is NULL), OR
+     * - Its category matches one of the object's categories
+     *
+     * @param User $user User object
+     * @param array $object_category_ids Array of category IDs the object belongs to
+     * @return array|int Array of templates or -1 on error
+     */
+    public function fetchAllForUserFiltered($user, $object_category_ids = array())
+    {
+        // First get all templates the user can access
+        $all_templates = $this->fetchAllForUser($user);
+
+        if (!is_array($all_templates)) {
+            return $all_templates; // Return error code
+        }
+
+        // If no category filter needed, return all templates
+        if (empty($object_category_ids)) {
+            // Show only templates with no category filter
+            $filtered = array();
+            foreach ($all_templates as $id => $tpl) {
+                if (empty($tpl->fk_category)) {
+                    $filtered[$id] = $tpl;
+                }
+            }
+            return $filtered;
+        }
+
+        // Filter templates by category
+        $filtered_templates = array();
+        foreach ($all_templates as $id => $tpl) {
+            // Include template if:
+            // 1. It has no category filter (available to all), OR
+            // 2. Its category is in the object's categories
+            if (empty($tpl->fk_category) || in_array($tpl->fk_category, $object_category_ids)) {
+                $filtered_templates[$id] = $tpl;
+            }
+        }
+
+        return $filtered_templates;
     }
 
     /**

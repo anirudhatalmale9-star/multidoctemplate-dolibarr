@@ -48,6 +48,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/lib/usergroups.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
+require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
 require_once __DIR__.'/class/template.class.php';
 
 // Load translations
@@ -113,6 +114,7 @@ if ($action == 'upload' && $user->hasRight('multidoctemplate', 'template_creer')
                 $template->label = GETPOST('template_label', 'alphanohtml') ?: pathinfo($filename, PATHINFO_FILENAME);
                 $template->description = GETPOST('template_description', 'restricthtml');
                 $template->tag = GETPOST('template_tag', 'alphanohtml');
+                $template->fk_category = GETPOST('template_category', 'int');
                 $template->fk_usergroup = $object->id;
                 $template->filename = $sanitized_filename;
                 $template->filepath = $filepath;
@@ -225,6 +227,46 @@ if ($user->hasRight('multidoctemplate', 'template_creer')) {
     print '<td><textarea name="template_description" rows="2" cols="40" class="flat"></textarea></td>';
     print '</tr>';
 
+    // Category filter (optional - template only shows for objects with this category)
+    print '<tr class="oddeven">';
+    print '<td>'.$langs->trans('CategoryFilter').' ('.$langs->trans('Optional').')</td>';
+    print '<td>';
+    // Get all customer/supplier categories
+    $cat = new Categorie($db);
+    print '<select name="template_category" class="flat minwidth200">';
+    print '<option value="0">-- '.$langs->trans('NoFilter').' --</option>';
+    // Customer categories
+    $customer_cats = $cat->get_all_categories(Categorie::TYPE_CUSTOMER, 'label');
+    if (is_array($customer_cats) && count($customer_cats) > 0) {
+        print '<optgroup label="'.$langs->trans('CustomersCategoriesShort').'">';
+        foreach ($customer_cats as $c) {
+            print '<option value="'.$c->id.'">'.dol_escape_htmltag($c->label).'</option>';
+        }
+        print '</optgroup>';
+    }
+    // Supplier categories
+    $supplier_cats = $cat->get_all_categories(Categorie::TYPE_SUPPLIER, 'label');
+    if (is_array($supplier_cats) && count($supplier_cats) > 0) {
+        print '<optgroup label="'.$langs->trans('SuppliersCategoriesShort').'">';
+        foreach ($supplier_cats as $c) {
+            print '<option value="'.$c->id.'">'.dol_escape_htmltag($c->label).'</option>';
+        }
+        print '</optgroup>';
+    }
+    // Contact categories
+    $contact_cats = $cat->get_all_categories(Categorie::TYPE_CONTACT, 'label');
+    if (is_array($contact_cats) && count($contact_cats) > 0) {
+        print '<optgroup label="'.$langs->trans('ContactCategoriesShort').'">';
+        foreach ($contact_cats as $c) {
+            print '<option value="'.$c->id.'">'.dol_escape_htmltag($c->label).'</option>';
+        }
+        print '</optgroup>';
+    }
+    print '</select>';
+    print '<br><small>'.$langs->trans('CategoryFilterHelp').'</small>';
+    print '</td>';
+    print '</tr>';
+
     // File
     print '<tr class="oddeven">';
     print '<td>'.$langs->trans('File').' <span class="star">*</span></td>';
@@ -256,10 +298,14 @@ print '<table class="noborder centpercent">';
 print '<tr class="liste_titre">';
 print '<th>'.$langs->trans('Tag').'</th>';
 print '<th>'.$langs->trans('Label').'</th>';
+print '<th>'.$langs->trans('CategoryFilter').'</th>';
 print '<th>'.$langs->trans('Filename').'</th>';
 print '<th>'.$langs->trans('Type').'</th>';
 print '<th class="center">'.$langs->trans('Actions').'</th>';
 print '</tr>';
+
+// Preload categories for display
+$cat_cache = array();
 
 if (is_array($templates) && count($templates) > 0) {
     foreach ($templates as $tpl) {
@@ -270,6 +316,23 @@ if (is_array($templates) && count($templates) > 0) {
 
         // Label
         print '<td>'.dol_escape_htmltag($tpl->label).'</td>';
+
+        // Category filter
+        print '<td>';
+        if (!empty($tpl->fk_category)) {
+            if (!isset($cat_cache[$tpl->fk_category])) {
+                $cat_obj = new Categorie($db);
+                if ($cat_obj->fetch($tpl->fk_category) > 0) {
+                    $cat_cache[$tpl->fk_category] = $cat_obj->label;
+                } else {
+                    $cat_cache[$tpl->fk_category] = '?';
+                }
+            }
+            print '<span class="badge badge-info">'.dol_escape_htmltag($cat_cache[$tpl->fk_category]).'</span>';
+        } else {
+            print '<span class="opacitymedium">-</span>';
+        }
+        print '</td>';
 
         // Filename
         print '<td>';
@@ -297,7 +360,7 @@ if (is_array($templates) && count($templates) > 0) {
         print '</tr>';
     }
 } else {
-    print '<tr class="oddeven"><td colspan="5" class="opacitymedium">'.$langs->trans('NoTemplatesYet').'</td></tr>';
+    print '<tr class="oddeven"><td colspan="6" class="opacitymedium">'.$langs->trans('NoTemplatesYet').'</td></tr>';
 }
 
 print '</table>';

@@ -66,3 +66,10 @@ ErrorPdfLibraryNotFound=PDF library not found
 # Other
 FileNotFound=File not found
 ConvertToPdf=Convert to PDF
+SelectTag=-- Select a Tag --
+AddNewTag=Add New Tag
+NewTag=Enter new tag
+ExpandAll=Expand All
+CollapseAll=Collapse All
+NoTag=No Tag
+CategoryFilterHelp=If set, this template will only appear for customers/contacts with this category

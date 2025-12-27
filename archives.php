@@ -307,8 +307,9 @@ if ($user->hasRight('multidoctemplate', 'archive_creer')) {
     print '<div class="tabsAction">';
     print load_fiche_titre($langs->trans('GenerateArchive'), '', '');
 
-    // Get available templates for user
-    $templates = $template->fetchAllForUser($user);
+    // Get available templates for user, filtered by object's categories
+    $object_category_ids = array_keys($object_categories);
+    $templates = $template->fetchAllForUserFiltered($user, $object_category_ids);
 
     if (is_array($templates) && count($templates) > 0) {
         // Group templates by tag
@@ -541,10 +542,32 @@ if ($user->hasRight('multidoctemplate', 'archive_creer')) {
     print '<div class="fichecenter">';
     print '<table class="noborder centpercent">';
 
-    // Tag (folder)
+    // Tag (folder) - dropdown with existing tags + option to add new
     print '<tr class="oddeven">';
     print '<td class="titlefield">'.$langs->trans('Tag').' <span class="star">*</span></td>';
-    print '<td><input type="text" name="upload_tag" size="40" class="flat" placeholder="e.g. CONTRATOS, FACTURAS" required></td>';
+    print '<td>';
+    // Get all existing tags from templates
+    $all_tags = array();
+    $all_templates = $template->fetchAllForUser($user);
+    if (is_array($all_templates)) {
+        foreach ($all_templates as $tpl) {
+            if (!empty($tpl->tag) && !in_array($tpl->tag, $all_tags)) {
+                $all_tags[] = $tpl->tag;
+            }
+        }
+    }
+    sort($all_tags);
+
+    print '<select name="upload_tag_select" id="upload_tag_select" class="flat minwidth200" onchange="updateTagInput(this)">';
+    print '<option value="">'.$langs->trans('SelectTag').'</option>';
+    foreach ($all_tags as $tag) {
+        print '<option value="'.dol_escape_htmltag($tag).'">'.dol_escape_htmltag($tag).'</option>';
+    }
+    print '<option value="__new__">-- '.$langs->trans('AddNewTag').' --</option>';
+    print '</select>';
+    print ' <input type="text" name="upload_tag_new" id="upload_tag_new" size="30" class="flat" placeholder="'.$langs->trans('NewTag').'" style="display:none;">';
+    print '<input type="hidden" name="upload_tag" id="upload_tag_hidden" value="">';
+    print '</td>';
     print '</tr>';
 
     // Label (optional)
@@ -577,10 +600,17 @@ print load_fiche_titre($langs->trans('ArchivesList'), '', '');
 $archives = $archive->fetchAllByObject($object_type, $object->id);
 
 if (is_array($archives) && count($archives) > 0) {
-    // Group archives by tag
+    // Group archives by tag (use tag_filter for direct uploads, template_tag for generated docs)
     $archives_by_tag = array();
     foreach ($archives as $arch) {
-        $tag_label = !empty($arch->template_tag) ? $arch->template_tag : $langs->trans('NoTag');
+        // For direct uploads (no template), use tag_filter; otherwise use template's tag
+        if (!empty($arch->template_tag)) {
+            $tag_label = $arch->template_tag;
+        } elseif (!empty($arch->tag_filter)) {
+            $tag_label = $arch->tag_filter;
+        } else {
+            $tag_label = $langs->trans('NoTag');
+        }
         if (!isset($archives_by_tag[$tag_label])) {
             $archives_by_tag[$tag_label] = array();
         }
@@ -775,6 +805,36 @@ function sortArchiveTable(tagId, colIndex) {
 } else {
     print '<div class="opacitymedium">'.$langs->trans('NoArchivesYet').'</div>';
 }
+
+// JavaScript for direct upload tag selection
+print '<script type="text/javascript">
+function updateTagInput(selectEl) {
+    var newTagInput = document.getElementById("upload_tag_new");
+    var hiddenInput = document.getElementById("upload_tag_hidden");
+
+    if (selectEl.value === "__new__") {
+        newTagInput.style.display = "inline";
+        newTagInput.required = true;
+        newTagInput.focus();
+        hiddenInput.value = "";
+    } else {
+        newTagInput.style.display = "none";
+        newTagInput.required = false;
+        newTagInput.value = "";
+        hiddenInput.value = selectEl.value;
+    }
+}
+
+// Update hidden field when typing new tag
+document.addEventListener("DOMContentLoaded", function() {
+    var newTagInput = document.getElementById("upload_tag_new");
+    if (newTagInput) {
+        newTagInput.addEventListener("input", function() {
+            document.getElementById("upload_tag_hidden").value = this.value;
+        });
+    }
+});
+</script>';
 
 llxFooter();
 $db->close();

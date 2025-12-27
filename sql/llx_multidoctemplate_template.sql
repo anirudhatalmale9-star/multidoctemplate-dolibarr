@@ -10,6 +10,7 @@ CREATE TABLE llx_multidoctemplate_template (
     label           VARCHAR(255) NOT NULL,
     description     TEXT,
     tag             VARCHAR(128) NOT NULL DEFAULT '',
+    fk_category     INTEGER DEFAULT NULL,
     fk_usergroup    INTEGER NOT NULL,
     filename        VARCHAR(255) NOT NULL,
     filepath        VARCHAR(512) NOT NULL,
